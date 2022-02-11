@@ -28,8 +28,9 @@ export const SiteBrowserDiag: React.FC<Props> = (props) => {
     };
     const [spoAuthInfo, setSpoAuthInfo] = React.useState<SPAuthInfo | null>(null);
 
-    React.useEffect(() => {
+    const loadToken = React.useCallback( () => {
 
+        // Get SPO bearer token from API
         fetch('AppConfiguration/GetSharePointToken', {
             method: 'GET',
             headers: {
@@ -41,7 +42,7 @@ export const SiteBrowserDiag: React.FC<Props> = (props) => {
                 const spoAuthToken: string = await response.text();
 
                 const url = `${props.targetSite.rootURL}/_api/contextinfo`;
-                await fetch(url, {
+                fetch(url, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -53,18 +54,18 @@ export const SiteBrowserDiag: React.FC<Props> = (props) => {
                         const digestJson: any = await spoResponse.json();
                         
                         setSpoAuthInfo({bearer: spoAuthToken, digest: digestJson.d.GetContextWebInformation.FormDigestValue});
-                        return Promise.resolve(spoAuthInfo);
+                        return <div>Done</div>
                     })
             })
             .catch(err => {
 
-                alert('Loading SPO token failed');
+                return <div>Got error loading token</div>;
+            });
+            
+        return <div>Loading...</div>;
+    }, []);
 
-                return Promise.reject();
-            });    
-    });
-
-    const Transition = React.forwardRef(function Transition(
+    const DiagTransition = React.forwardRef(function Transition(
         props: TransitionProps & {
             children: React.ReactElement;
         },
@@ -75,11 +76,17 @@ export const SiteBrowserDiag: React.FC<Props> = (props) => {
 
     return (
         <div>
+            {spoAuthInfo === null ? 
+            (
+                loadToken()
+            )
+            :
+            (
             <Dialog
                 fullScreen
                 open={props.open}
                 onClose={handleClose}
-                TransitionComponent={Transition}>
+                TransitionComponent={DiagTransition}>
 
                 <AppBar sx={{ position: 'relative' }}>
                     <Toolbar>
@@ -98,15 +105,11 @@ export const SiteBrowserDiag: React.FC<Props> = (props) => {
                         </Button>
                     </Toolbar>
                 </AppBar>
-                {spoAuthInfo === null ?
-                    (
-                        <div>Loading</div>
-                    ) :
-                    (
-                        <SiteList spoAuthInfo={spoAuthInfo} targetSite={props.targetSite} />
-                    )
-                }
+                <SiteList spoAuthInfo={spoAuthInfo} targetSite={props.targetSite} />
+                
             </Dialog>
+            )
+            }
         </div>
     );
 }

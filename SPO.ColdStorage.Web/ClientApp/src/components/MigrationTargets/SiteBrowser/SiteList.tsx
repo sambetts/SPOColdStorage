@@ -15,7 +15,7 @@ export const SiteList: React.FC<Props> = (props) => {
     const [lists, setLists] = React.useState<SPList[] | null>(null);
 
     const getSiteLists = React.useCallback(async () => {
-        return await fetch(`${props.targetSite.rootURL}/_api/web/lists`, {
+        fetch(`${props.targetSite.rootURL}/_api/web/lists`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -31,44 +31,34 @@ export const SiteList: React.FC<Props> = (props) => {
 
                 if (data.d?.results) {
                     setLists(data.d.results);
-                    return Promise.resolve(data);
                 }
                 else {
                     alert('Unexpected response from SharePoint for lists: ' + responseText);
                     return Promise.reject();
                 }
             });
+            
+        return (<div>Loading lists...</div>);
     }, []);
 
-    React.useEffect(() => {
-        getSiteLists();
-    }, []);
-
-    const renderTree = (nodes: SPList[]) => (
-        nodes.map((node: SPList) => 
-        (
-            <SiteNode list={node} spoAuthInfo={props.spoAuthInfo} targetSite={props.targetSite} />
-        ))
-    );
-
-    const onNodeToggle = (e: any, nodeId: string[]) => 
-    {
-
+    const onListToggle = (e: any, nodeId: string[]) => {
+        // Do something
     }
 
     return (
         <div>
             {lists === null ?
                 (
-                    <div>Loading lists...</div>
+                    getSiteLists()
                 )
                 :
                 (
-                    <TreeView onNodeToggle={onNodeToggle}
-                        defaultCollapseIcon={<ExpandMoreIcon />}
-                        defaultExpandIcon={<ChevronRightIcon />}
-                    >
-                        {renderTree(lists)}
+                    <TreeView onNodeToggle={onListToggle} defaultCollapseIcon={<ExpandMoreIcon />} defaultExpandIcon={<ChevronRightIcon />} >
+                        {lists.map((node: SPList) =>
+                        (
+                            <SiteNode list={node} spoAuthInfo={props.spoAuthInfo} targetSite={props.targetSite} />
+                        )
+                        )}
                     </TreeView>
                 )
             }
