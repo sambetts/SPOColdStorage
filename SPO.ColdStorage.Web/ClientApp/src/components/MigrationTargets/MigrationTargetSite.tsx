@@ -6,10 +6,10 @@ interface Props {
     token: string,
     targetSite: TargetMigrationSite,
     removeSiteUrl: Function,
-    configureListsAndFolders: Function
+    selectLists: Function
 }
 
-export const MigrationTarget: React.FC<Props> = (props) => {
+export const MigrationTargetSite: React.FC<Props> = (props) => {
 
     return (
         <div>
@@ -29,7 +29,7 @@ export const MigrationTarget: React.FC<Props> = (props) => {
                         </div>
                     )
                 }
-                <li><Button onClick={() => props.configureListsAndFolders(props.targetSite)}>Add folder to whitelist</Button></li>
+                <li><Button onClick={() => props.selectLists(props.targetSite)}>Select lists</Button></li>
             </ul>
         </div>
     );

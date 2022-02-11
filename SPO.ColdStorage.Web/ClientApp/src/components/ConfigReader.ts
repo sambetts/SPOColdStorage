@@ -1,4 +1,3 @@
-import React from 'react';
 
 export const getStorageConfigFromAPI = async (token : string) => {
   return await fetch('AppConfiguration/GetServiceConfiguration', {

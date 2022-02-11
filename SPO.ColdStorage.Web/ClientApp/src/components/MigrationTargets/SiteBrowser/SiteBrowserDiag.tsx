@@ -28,12 +28,13 @@ export const SiteBrowserDiag: React.FC<Props> = (props) => {
     };
     const [spoAuthInfo, setSpoAuthInfo] = React.useState<SPAuthInfo | null>(null);
 
-    const getSpoToken = React.useCallback(async (token : string) => {
-        return await fetch('AppConfiguration/GetSharePointToken', {
+    React.useEffect(() => {
+
+        fetch('AppConfiguration/GetSharePointToken', {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token,
+                'Authorization': 'Bearer ' + props.token,
             }
         })
             .then(async response => {
@@ -54,21 +55,14 @@ export const SiteBrowserDiag: React.FC<Props> = (props) => {
                         setSpoAuthInfo({bearer: spoAuthToken, digest: digestJson.d.GetContextWebInformation.FormDigestValue});
                         return Promise.resolve(spoAuthInfo);
                     })
-
             })
             .catch(err => {
 
                 alert('Loading SPO token failed');
 
                 return Promise.reject();
-            });
-    }, []);
-
-
-    React.useEffect(() => {
-        if (props.token)
-            getSpoToken(props.token);
-    }, []);
+            });    
+    });
 
     const Transition = React.forwardRef(function Transition(
         props: TransitionProps & {

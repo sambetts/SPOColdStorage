@@ -1,7 +1,7 @@
 import '../NavMenu.css';
 import React from 'react';
 import { NewTargetForm } from './NewTargetForm'
-import { MigrationTarget } from './MigrationTarget'
+import { MigrationTargetSite } from './MigrationTargetSite'
 import Button from '@mui/material/Button';
 
 import { SiteBrowserDiag } from './SiteBrowser/SiteBrowserDiag';
@@ -11,7 +11,9 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
 
   const [loading, setLoading] = React.useState<boolean>(false);
   const [targetMigrationSites, setTargetMigrationSites] = React.useState<Array<TargetMigrationSite>>([]);
-  const [selectedSite, setSelectedSite] = React.useState<TargetMigrationSite | null>(null);
+
+  // Dialogue box for a site list-picker opens when this isn't null
+  const [selectedSiteForDialogue, setSelectedSiteForDialogue] = React.useState<TargetMigrationSite | null>(null);
 
   const getMigrationTargets = React.useCallback(async (token) => {
     return await fetch('AppConfiguration/GetMigrationTargets', {
@@ -37,18 +39,17 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
 
   React.useEffect(() => {
 
-    if (props.token) {
+    // Load sites config from API
+    getMigrationTargets(props.token)
+      .then((allTargetSites: TargetMigrationSite[]) => {
 
-      // Load sites config from API
-      getMigrationTargets(props.token)
-        .then((allTargetSites: TargetMigrationSite[]) => {
+        setTargetMigrationSites(allTargetSites);
 
-          setTargetMigrationSites(allTargetSites);
+      });
 
-        });
-    }
   }, [props, getMigrationTargets]);
 
+  // Add new site URL
   const addNewSiteUrl = (newSiteUrl: string) => {
     targetMigrationSites.forEach(s => {
       if (s.rootURL === newSiteUrl) {
@@ -64,6 +65,7 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
     setTargetMigrationSites(s => [...s, newSiteDef]);
   };
 
+
   const removeSiteUrl = (selectedSite: TargetMigrationSite) => {
     const idx = targetMigrationSites.indexOf(selectedSite);
     if (idx > -1) {
@@ -72,8 +74,8 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
     }
   };
 
-  const configureListsAndFolders = (selectedSite: TargetMigrationSite) => {
-    setSelectedSite(selectedSite);
+  const selectLists = (selectedSite: TargetMigrationSite) => {
+    setSelectedSiteForDialogue(selectedSite);
   };
 
   const saveAll = () => {
@@ -107,14 +109,18 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
   };
 
   const closeDiag = () => {
-    setSelectedSite(null);
+    setSelectedSiteForDialogue(null);
   }
+
 
   return (
     <div>
-      <h1>Cold Storage Access Web</h1>
+      <h1>Cold Storage Migration Targets</h1>
 
-      <p>Target sites for migration. When the migration tools run, these sites will be indexed &amp; copied to cold-storage.</p>
+      <p>
+        When the migration tools run, these sites will be indexed &amp; copied to cold-storage. 
+        You can filter by list/library and then folders too.
+      </p>
 
       {!loading ?
         (
@@ -125,8 +131,8 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
               (
                 <div id='migrationTargets'>
                   {targetMigrationSites.map((targetMigrationSite: TargetMigrationSite) => (
-                    <MigrationTarget token={props.token} targetSite={targetMigrationSite}
-                      removeSiteUrl={removeSiteUrl} configureListsAndFolders={configureListsAndFolders} />
+                    <MigrationTargetSite token={props.token} targetSite={targetMigrationSite}
+                      removeSiteUrl={removeSiteUrl} selectLists={selectLists} />
                   ))}
 
                 </div>
@@ -142,8 +148,8 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
         : <div>Loading...</div>
       }
 
-      {selectedSite &&
-        <SiteBrowserDiag token={props.token} targetSite={selectedSite} open={selectedSite !== null} onClose={closeDiag} />
+      {selectedSiteForDialogue &&
+        <SiteBrowserDiag token={props.token} targetSite={selectedSiteForDialogue} open={selectedSiteForDialogue !== null} onClose={closeDiag} />
       }
     </div>
   );
