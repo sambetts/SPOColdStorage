@@ -14,7 +14,7 @@ interface Props {
 export const SiteList: React.FC<Props> = (props) => {
     const [lists, setLists] = React.useState<SPList[] | null>(null);
 
-    const getSiteLists = React.useCallback(async () => {
+    React.useEffect(() => {
         fetch(`${props.targetSite.rootURL}/_api/web/lists`, {
             method: 'GET',
             headers: {
@@ -37,8 +37,6 @@ export const SiteList: React.FC<Props> = (props) => {
                     return Promise.reject();
                 }
             });
-            
-        return (<div>Loading lists...</div>);
     }, []);
 
     const onListToggle = (e: any, nodeId: string[]) => {
@@ -49,7 +47,7 @@ export const SiteList: React.FC<Props> = (props) => {
         <div>
             {lists === null ?
                 (
-                    getSiteLists()
+                    <div>Loading...</div>
                 )
                 :
                 (

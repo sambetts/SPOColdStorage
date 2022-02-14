@@ -28,42 +28,47 @@ export const SiteBrowserDiag: React.FC<Props> = (props) => {
     };
     const [spoAuthInfo, setSpoAuthInfo] = React.useState<SPAuthInfo | null>(null);
 
-    const loadToken = React.useCallback( () => {
+    React.useEffect(() => {
 
-        // Get SPO bearer token from API
-        fetch('AppConfiguration/GetSharePointToken', {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + props.token,
-            }
-        })
-            .then(async response => {
-                const spoAuthToken: string = await response.text();
-
-                const url = `${props.targetSite.rootURL}/_api/contextinfo`;
-                fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Accept: "application/json;odata=verbose",
-                        'Authorization': 'Bearer ' + spoAuthToken,
-                    }
-                })
-                    .then(async spoResponse => {
-                        const digestJson: any = await spoResponse.json();
-                        
-                        setSpoAuthInfo({bearer: spoAuthToken, digest: digestJson.d.GetContextWebInformation.FormDigestValue});
-                        return <div>Done</div>
-                    })
-            })
-            .catch(err => {
-
-                return <div>Got error loading token</div>;
-            });
+        if (!spoAuthInfo) {
             
-        return <div>Loading...</div>;
+            // Get SPO bearer token from API
+            fetch('AppConfiguration/GetSharePointToken', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + props.token,
+                }
+            })
+                .then(response => {
+                    response.text().then((spoAuthToken: string) => {
+
+                        // Get SP digest with OAuth token
+                        const url = `${props.targetSite.rootURL}/_api/contextinfo`;
+                        fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Accept: "application/json;odata=verbose",
+                                'Authorization': 'Bearer ' + spoAuthToken,
+                            }
+                        })
+                            .then(spoResponse => {
+                                spoResponse.json().then((digestJson: any) => {
+                                    setSpoAuthInfo({ bearer: spoAuthToken, digest: digestJson.d.GetContextWebInformation.FormDigestValue });
+                                });
+
+                            });
+
+                    });
+                })
+                .catch(err => {
+                    alert('Got error loading token');
+                });
+        }
+
     }, []);
+
 
     const DiagTransition = React.forwardRef(function Transition(
         props: TransitionProps & {
@@ -76,39 +81,39 @@ export const SiteBrowserDiag: React.FC<Props> = (props) => {
 
     return (
         <div>
-            {spoAuthInfo === null ? 
-            (
-                loadToken()
-            )
-            :
-            (
-            <Dialog
-                fullScreen
-                open={props.open}
-                onClose={handleClose}
-                TransitionComponent={DiagTransition}>
+            {spoAuthInfo === null ?
+                (
+                    <div>Loading</div>
+                )
+                :
+                (
+                    <Dialog
+                        fullScreen
+                        open={props.open}
+                        onClose={handleClose}
+                        TransitionComponent={DiagTransition}>
 
-                <AppBar sx={{ position: 'relative' }}>
-                    <Toolbar>
-                        <IconButton
-                            edge="start"
-                            color="inherit"
-                            onClick={handleClose}
-                            aria-label="close">
-                            <CloseIcon />
-                        </IconButton>
-                        <Typography sx={{ ml: 2, flex: 1 }} variant="h6" component="div">
-                            Select Contents to Migrate: {props.targetSite.rootURL}
-                        </Typography>
-                        <Button autoFocus color="inherit" onClick={handleClose}>
-                            Save
-                        </Button>
-                    </Toolbar>
-                </AppBar>
-                <SiteList spoAuthInfo={spoAuthInfo} targetSite={props.targetSite} />
-                
-            </Dialog>
-            )
+                        <AppBar sx={{ position: 'relative' }}>
+                            <Toolbar>
+                                <IconButton
+                                    edge="start"
+                                    color="inherit"
+                                    onClick={handleClose}
+                                    aria-label="close">
+                                    <CloseIcon />
+                                </IconButton>
+                                <Typography sx={{ ml: 2, flex: 1 }} variant="h6" component="div">
+                                    Select Contents to Migrate: {props.targetSite.rootURL}
+                                </Typography>
+                                <Button autoFocus color="inherit" onClick={handleClose}>
+                                    Save
+                                </Button>
+                            </Toolbar>
+                        </AppBar>
+                        <SiteList spoAuthInfo={spoAuthInfo!} targetSite={props.targetSite} />
+
+                    </Dialog>
+                )
             }
         </div>
     );
