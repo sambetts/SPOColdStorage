@@ -5,7 +5,7 @@ import { MigrationTargetSite } from './MigrationTargetSite'
 import Button from '@mui/material/Button';
 
 import { SiteBrowserDiag } from './SiteBrowser/SiteBrowserDiag';
-import { TargetMigrationSite } from './TargetSitesInterfaces';
+import { ListFolderConfig, TargetMigrationSite } from './TargetSitesInterfaces';
 
 export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
 
@@ -16,6 +16,8 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
   const [selectedSiteForDialogue, setSelectedSiteForDialogue] = React.useState<TargetMigrationSite | null>(null);
 
   const getMigrationTargets = React.useCallback(async (token) => {
+
+    // Return list of configured sites & folders to migrate from own API
     return await fetch('AppConfiguration/GetMigrationTargets', {
       method: 'GET',
       headers: {
@@ -30,7 +32,9 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
       })
       .catch(err => {
 
-        // alert('Loading storage data failed');
+        console.error('Loading migration configuration failed:');
+        console.error(err);
+        
         setLoading(false);
 
         return Promise.reject();
@@ -41,13 +45,26 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
 
     // Load sites config from API
     getMigrationTargets(props.token)
-      .then((allTargetSites: TargetMigrationSite[]) => {
+      .then((loadedTargetSites: TargetMigrationSite[]) => {
 
-        setTargetMigrationSites(allTargetSites);
+        // Set all loaded targets as "include"
+        var sites = loadedTargetSites.map((loadedTargetSite: TargetMigrationSite) => 
+        {
+          var siteListFilter = loadedTargetSite.siteFilterConfig!.listFilterConfig.map((list: ListFolderConfig) => 
+          {
+            list.includeInMigration = true;
+            return list;
+          });
+          loadedTargetSite.siteFilterConfig!.listFilterConfig = siteListFilter;
+
+          return loadedTargetSite;
+        });
+
+        setTargetMigrationSites(sites);
 
       });
 
-  }, [props, getMigrationTargets]);
+  }, [props.token, getMigrationTargets]);
 
   // Add new site URL
   const addNewSiteUrl = (newSiteUrl: string) => {
@@ -65,7 +82,6 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
     setTargetMigrationSites(s => [...s, newSiteDef]);
   };
 
-
   const removeSiteUrl = (selectedSite: TargetMigrationSite) => {
     const idx = targetMigrationSites.indexOf(selectedSite);
     if (idx > -1) {
@@ -77,6 +93,27 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
   const selectLists = (selectedSite: TargetMigrationSite) => {
     setSelectedSiteForDialogue(selectedSite);
   };
+
+    
+  const folderRemoved = (folder : string, list : ListFolderConfig, site: TargetMigrationSite) => {
+    const idx = list.folderWhiteList.indexOf(folder);
+    if (idx > -1) {
+      targetMigrationSites.splice(idx);
+      list.folderWhiteList = list.folderWhiteList.filter((value, i) => i !== idx);
+      alert("Folder removed");
+    }
+  }
+  const folderAdd = (folder : string, list : ListFolderConfig, site: TargetMigrationSite) => {
+    list.folderWhiteList.push(folder);
+    alert("Folder added");
+  } 
+
+  const listRemoved = (list : ListFolderConfig, site: TargetMigrationSite) => {
+    alert("List removed");
+  }
+  const listAdd = (list : ListFolderConfig, site: TargetMigrationSite) => {
+    alert("List added");
+  }
 
   const saveAll = () => {
     setLoading(true);
@@ -149,7 +186,13 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
       }
 
       {selectedSiteForDialogue &&
-        <SiteBrowserDiag token={props.token} targetSite={selectedSiteForDialogue} open={selectedSiteForDialogue !== null} onClose={closeDiag} />
+        <SiteBrowserDiag token={props.token} targetSite={selectedSiteForDialogue} 
+          open={selectedSiteForDialogue !== null} onClose={closeDiag} 
+          folderAdd={(f : string, list : ListFolderConfig, site: TargetMigrationSite)=> folderAdd(f, list, site)}
+          folderRemoved={(f : string, list : ListFolderConfig, site: TargetMigrationSite)=> folderRemoved(f, list, site)}
+          listAdd={(list : ListFolderConfig, site: TargetMigrationSite) => listAdd(list, site)} 
+          listRemoved={(list : ListFolderConfig, site: TargetMigrationSite) => listRemoved(list, site)}
+          />
       }
     </div>
   );

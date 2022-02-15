@@ -42,22 +42,29 @@ export default function App() {
 
 
     return (
-        <Layout>
+        <div>
             {accessToken ?
                 (
-                    <AuthenticatedTemplate>
-                        <Route exact path='/' render={() => <FileBrowser {... { token: accessToken! }} />} />
-                        <Route path='/FindFile' render={() => <FindFile {... { token: accessToken! }} />} />
-                        <Route path='/MigrationTargets' render={() => <MigrationTargetsConfig {... { token: accessToken! }} />} />
-                    </AuthenticatedTemplate>)
+                    <Layout>
+                        <AuthenticatedTemplate>
+                            <Route exact path='/' render={() => <FileBrowser {... { token: accessToken! }} />} />
+                            <Route path='/FindFile' render={() => <FindFile {... { token: accessToken! }} />} />
+                            <Route path='/MigrationTargets' render={() => <MigrationTargetsConfig {... { token: accessToken! }} />} />
+                        </AuthenticatedTemplate>
+                        <UnauthenticatedTemplate>
+                            <Route exact path='/' component={Login} />
+                        </UnauthenticatedTemplate>
+                    </Layout>
+                )
                 :
                 (
-                    <UnauthenticatedTemplate>
-                        <Route exact path='/' component={Login} />
-                    </UnauthenticatedTemplate>
+                    <Layout>
+                        <UnauthenticatedTemplate>
+                            <Route exact path='/' component={Login} />
+                        </UnauthenticatedTemplate>
+                    </Layout>
                 )}
-
-        </Layout>
+        </div>
     );
 
 }

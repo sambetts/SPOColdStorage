@@ -10,15 +10,19 @@ import Slide from '@mui/material/Slide';
 import { TransitionProps } from '@mui/material/transitions';
 
 
-import { TargetMigrationSite } from '../TargetSitesInterfaces';
-import { SiteList } from './SiteList';
+import { ListFolderConfig, TargetMigrationSite } from '../TargetSitesInterfaces';
+import { SiteListsAndLibraries } from './SiteListsAndLibraries';
 import { SPAuthInfo } from './SPDefs';
 
 interface Props {
     token: string,
     targetSite: TargetMigrationSite,
     open: boolean,
-    onClose: Function
+    onClose: Function,
+    folderRemoved: Function,
+    folderAdd: Function,
+    listRemoved: Function,
+    listAdd: Function
 }
 
 export const SiteBrowserDiag: React.FC<Props> = (props) => {
@@ -54,6 +58,8 @@ export const SiteBrowserDiag: React.FC<Props> = (props) => {
                             }
                         })
                             .then(spoResponse => {
+
+                                // Remember SPO auth code & digest
                                 spoResponse.json().then((digestJson: any) => {
                                     setSpoAuthInfo({ bearer: spoAuthToken, digest: digestJson.d.GetContextWebInformation.FormDigestValue });
                                 });
@@ -67,7 +73,7 @@ export const SiteBrowserDiag: React.FC<Props> = (props) => {
                 });
         }
 
-    }, []);
+    }, [props.targetSite.rootURL, props.token, spoAuthInfo]);
 
 
     const DiagTransition = React.forwardRef(function Transition(
@@ -78,6 +84,22 @@ export const SiteBrowserDiag: React.FC<Props> = (props) => {
     ) {
         return <Slide direction="up" ref={ref} {...props} />;
     });
+
+
+    const folderRemoved = (folder : string, list : ListFolderConfig) => {
+        props.folderRemoved(folder, list, props.targetSite);
+    }
+    const folderAdd = (folder : string, list : ListFolderConfig) => {
+        props.folderAdd(folder, list, props.targetSite);
+    }
+
+    const listRemoved = (list : ListFolderConfig) => {
+        props.listRemoved(list, props.targetSite);
+    }
+    const listAdd = (list : ListFolderConfig) => {
+        props.listAdd(list, props.targetSite);
+    }
+
 
     return (
         <div>
@@ -110,7 +132,12 @@ export const SiteBrowserDiag: React.FC<Props> = (props) => {
                                 </Button>
                             </Toolbar>
                         </AppBar>
-                        <SiteList spoAuthInfo={spoAuthInfo!} targetSite={props.targetSite} />
+                        <SiteListsAndLibraries spoAuthInfo={spoAuthInfo!} targetSite={props.targetSite} 
+                            folderAdd={(f : string, list : ListFolderConfig)=> folderAdd(f, list)}
+                            folderRemoved={(f : string, list : ListFolderConfig)=> folderRemoved(f, list)}
+                            listAdd={(list : ListFolderConfig) => listAdd(list)} 
+                            listRemoved={(list : ListFolderConfig) => listRemoved(list)}
+                        />
 
                     </Dialog>
                 )

@@ -1,6 +1,7 @@
 import React from "react";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "../authConfig";
+import { Button } from "@mui/material";
 
 function handleLogin(instance: any) {
     instance.loginPopup(loginRequest).catch((e : Error) => {
@@ -15,6 +16,6 @@ export const SignInButton = () => {
     const { instance } = useMsal();
 
     return (
-        <button className="ml-auto" onClick={() => handleLogin(instance)}>Sign in to Azure AD</button>
+        <Button onClick={() => handleLogin(instance)}>Sign in to Azure AD</Button>
     );
 }

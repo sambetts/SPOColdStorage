@@ -10,6 +10,7 @@ interface TargetMigrationSite {
   
   interface ListFolderConfig{
     listTitle: string;
+    includeInMigration: boolean;
     folderWhiteList: string[];
   }
 
