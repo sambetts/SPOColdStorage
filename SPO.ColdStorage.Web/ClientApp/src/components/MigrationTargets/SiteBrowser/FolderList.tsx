@@ -19,10 +19,23 @@ export const FolderList: React.FC<Props> = (props) => {
         setFolders(props.folderWhiteList);
     }, [props.folderWhiteList]);
 
+    
+    const removeFolder = (folder: string) => {
+        
+        const idx = folders.indexOf(folder);
+        if (idx > -1) {
+            setFolders(oldList => oldList.filter((value, i) => i !== idx));
+        }
+
+        props.folderRemoved(folder)
+    }
+
+
     const newFolderValChange = (val: string) => {
         setNewFilterVal(val);
     };
     const addNewFilter = () => {
+        setFolders(f=> ([...f, newFilterVal]));
         props.folderAdd(newFilterVal);
         setNewFilterVal("");
     }
@@ -40,7 +53,7 @@ export const FolderList: React.FC<Props> = (props) => {
                     label={
                         <FormControlLabel
                             control={
-                                <Button onClick={() => props.folderRemoved(folder)} />
+                                <Button onClick={() => removeFolder(folder)} />
                             }
                             label={<>{folder}</>}
                             key={folder}

@@ -34,7 +34,7 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
 
         console.error('Loading migration configuration failed:');
         console.error(err);
-        
+
         setLoading(false);
 
         return Promise.reject();
@@ -48,10 +48,8 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
       .then((loadedTargetSites: TargetMigrationSite[]) => {
 
         // Set all loaded targets as "include"
-        var sites = loadedTargetSites.map((loadedTargetSite: TargetMigrationSite) => 
-        {
-          var siteListFilter = loadedTargetSite.siteFilterConfig!.listFilterConfig.map((list: ListFolderConfig) => 
-          {
+        var sites = loadedTargetSites.map((loadedTargetSite: TargetMigrationSite) => {
+          var siteListFilter = loadedTargetSite.siteFilterConfig!.listFilterConfig.map((list: ListFolderConfig) => {
             list.includeInMigration = true;
             return list;
           });
@@ -94,24 +92,35 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
     setSelectedSiteForDialogue(selectedSite);
   };
 
-    
-  const folderRemoved = (folder : string, list : ListFolderConfig, site: TargetMigrationSite) => {
-    const idx = list.folderWhiteList.indexOf(folder);
-    if (idx > -1) {
-      targetMigrationSites.splice(idx);
-      list.folderWhiteList = list.folderWhiteList.filter((value, i) => i !== idx);
-      alert("Folder removed");
+
+  const folderRemoved = (folder: string, list: ListFolderConfig, site: TargetMigrationSite) => {
+
+    // Find the roit site
+    const siteIdx = targetMigrationSites.indexOf(site);
+    if (siteIdx > -1) {
+      var allButThisSite = targetMigrationSites.filter((value, i) => i !== siteIdx);
+
+      // Update model to send. Different from child state for display
+      const folderIdx = list.folderWhiteList.indexOf(folder);
+      if (folderIdx > -1) {
+        list.folderWhiteList = list.folderWhiteList.filter((value, i) => i !== folderIdx);
+        alert("Folder removed");
+      }
+      //[...f, newFilterVal]
     }
+
+
   }
-  const folderAdd = (folder : string, list : ListFolderConfig, site: TargetMigrationSite) => {
+  const folderAdd = (folder: string, list: ListFolderConfig, site: TargetMigrationSite) => {
+    // Update model to send. Different from child state for display
     list.folderWhiteList.push(folder);
     alert("Folder added");
-  } 
+  }
 
-  const listRemoved = (list : ListFolderConfig, site: TargetMigrationSite) => {
+  const listRemoved = (list: ListFolderConfig, site: TargetMigrationSite) => {
     alert("List removed");
   }
-  const listAdd = (list : ListFolderConfig, site: TargetMigrationSite) => {
+  const listAdd = (list: ListFolderConfig, site: TargetMigrationSite) => {
     alert("List added");
   }
 
@@ -155,7 +164,7 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
       <h1>Cold Storage Migration Targets</h1>
 
       <p>
-        When the migration tools run, these sites will be indexed &amp; copied to cold-storage. 
+        When the migration tools run, these sites will be indexed &amp; copied to cold-storage.
         You can filter by list/library and then folders too.
       </p>
 
@@ -186,13 +195,13 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
       }
 
       {selectedSiteForDialogue &&
-        <SiteBrowserDiag token={props.token} targetSite={selectedSiteForDialogue} 
-          open={selectedSiteForDialogue !== null} onClose={closeDiag} 
-          folderAdd={(f : string, list : ListFolderConfig, site: TargetMigrationSite)=> folderAdd(f, list, site)}
-          folderRemoved={(f : string, list : ListFolderConfig, site: TargetMigrationSite)=> folderRemoved(f, list, site)}
-          listAdd={(list : ListFolderConfig, site: TargetMigrationSite) => listAdd(list, site)} 
-          listRemoved={(list : ListFolderConfig, site: TargetMigrationSite) => listRemoved(list, site)}
-          />
+        <SiteBrowserDiag token={props.token} targetSite={selectedSiteForDialogue}
+          open={selectedSiteForDialogue !== null} onClose={closeDiag}
+          folderAdd={(f: string, list: ListFolderConfig, site: TargetMigrationSite) => folderAdd(f, list, site)}
+          folderRemoved={(f: string, list: ListFolderConfig, site: TargetMigrationSite) => folderRemoved(f, list, site)}
+          listAdd={(list: ListFolderConfig, site: TargetMigrationSite) => listAdd(list, site)}
+          listRemoved={(list: ListFolderConfig, site: TargetMigrationSite) => listRemoved(list, site)}
+        />
       }
     </div>
   );

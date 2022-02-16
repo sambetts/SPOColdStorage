@@ -26,7 +26,7 @@ export const ListFolders: React.FC<Props> = (props) => {
             props.listRemoved(props.targetList);
     }
 
-    const folderRemoved = (folder : string) => {
+    const folderRemoved = (folder : string) => {        
         props.folderRemoved(folder, props.targetList);
     }
     const folderAdd = (folder : string) => {
