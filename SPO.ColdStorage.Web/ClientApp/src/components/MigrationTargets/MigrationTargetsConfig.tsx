@@ -47,18 +47,7 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
     getMigrationTargets(props.token)
       .then((loadedTargetSites: TargetMigrationSite[]) => {
 
-        // Set all loaded targets as "include"
-        var sites = loadedTargetSites.map((loadedTargetSite: TargetMigrationSite) => {
-          var siteListFilter = loadedTargetSite.siteFilterConfig!.listFilterConfig.map((list: ListFolderConfig) => {
-            list.includeInMigration = true;
-            return list;
-          });
-          loadedTargetSite.siteFilterConfig!.listFilterConfig = siteListFilter;
-
-          return loadedTargetSite;
-        });
-
-        setTargetMigrationSites(sites);
+        setTargetMigrationSites(loadedTargetSites);
 
       });
 
@@ -117,10 +106,10 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
     alert("Folder added");
   }
 
-  const listRemoved = (list: ListFolderConfig, site: TargetMigrationSite) => {
+  const listRemoved = (list: string, site: TargetMigrationSite) => {
     alert("List removed");
   }
-  const listAdd = (list: ListFolderConfig, site: TargetMigrationSite) => {
+  const listAdd = (list: string, site: TargetMigrationSite) => {
     alert("List added");
   }
 
@@ -199,8 +188,8 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
           open={selectedSiteForDialogue !== null} onClose={closeDiag}
           folderAdd={(f: string, list: ListFolderConfig, site: TargetMigrationSite) => folderAdd(f, list, site)}
           folderRemoved={(f: string, list: ListFolderConfig, site: TargetMigrationSite) => folderRemoved(f, list, site)}
-          listAdd={(list: ListFolderConfig, site: TargetMigrationSite) => listAdd(list, site)}
-          listRemoved={(list: ListFolderConfig, site: TargetMigrationSite) => listRemoved(list, site)}
+          listAdd={(list: string, site: TargetMigrationSite) => listAdd(list, site)}
+          listRemoved={(list: string, site: TargetMigrationSite) => listRemoved(list, site)}
         />
       }
     </div>

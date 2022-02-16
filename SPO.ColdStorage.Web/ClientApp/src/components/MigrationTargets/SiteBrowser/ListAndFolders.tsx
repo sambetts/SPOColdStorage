@@ -1,13 +1,14 @@
 import React from 'react';
 import { ListFolderConfig } from '../TargetSitesInterfaces';
 import { FolderList } from './FolderList';
-import { SPAuthInfo } from './SPDefs';
+import { SPAuthInfo, SPList } from './SPDefs';
 import { TreeItem } from '@mui/lab';
 import { Checkbox, FormControlLabel } from "@mui/material";
 
 interface Props {
     spoAuthInfo: SPAuthInfo,
-    targetList: ListFolderConfig,
+    targetListConfig: ListFolderConfig | null,
+    list: SPList,
     folderRemoved: Function,
     folderAdd: Function,
     listRemoved: Function,
@@ -16,56 +17,49 @@ interface Props {
 
 export const ListFolders: React.FC<Props> = (props) => {
     const [checked, setChecked] = React.useState<boolean>(false);
-    const [list, setList] = React.useState<ListFolderConfig | null>();
 
     const checkChange = (checked: boolean) => {
         setChecked(checked);
         if (checked)
-            props.listAdd(props.targetList);
+            props.listAdd(props.list);
         else
-            props.listRemoved(props.targetList);
+            props.listRemoved(props.list);
     }
 
     const folderRemoved = (folder : string) => {        
-        props.folderRemoved(folder, props.targetList);
+        props.folderRemoved(folder, props.targetListConfig);
     }
     const folderAdd = (folder : string) => {
-        props.folderAdd(folder, props.targetList);
+        props.folderAdd(folder, props.targetListConfig);
     }
-
-    React.useEffect(() => {
-        setList(props.targetList);
-    }, [props.targetList]);
 
     React.useEffect(() => {
         // Default checked value
-        setChecked(props.targetList.includeInMigration);
-    }, [props.targetList]);
+        setChecked(props.targetListConfig !== null);
+    }, [props.targetListConfig]);
 
-    if (list)
-    {
-        return (
-            <TreeItem
-                key={list!.listTitle}
-                nodeId={list!.listTitle}
-                label={
-                    <FormControlLabel
-                        control={
-                            <Checkbox checked={checked}
-                                onChange={event => checkChange(event.currentTarget.checked)}
-                                onClick={e => e.stopPropagation()}
-                            />
-                        }
-                        label={<>{props.targetList.listTitle}</>}
-                    />
-                }
-            >
-                <FolderList folderWhiteList={props.targetList.folderWhiteList} 
+    return (
+        <TreeItem
+            key={props.list.Title}
+            nodeId={props.list.Title}
+            label={
+                <FormControlLabel
+                    control={
+                        <Checkbox checked={checked}
+                            onChange={event => checkChange(event.currentTarget.checked)}
+                            onClick={e => e.stopPropagation()}
+                        />
+                    }
+                    label={<>{props.list.Title}</>}
+                />
+            }
+        >
+            {props.targetListConfig && props.targetListConfig.folderWhiteList &&
+                <FolderList folderWhiteList={props.targetListConfig!.folderWhiteList} 
                     folderAdd={(f : string)=> folderAdd(f)}  folderRemoved={(f : string)=> folderRemoved(f)} />
-    
-            </TreeItem>
-        );
-    }
-    else
-        return <div></div>;
+            }
+            
+
+        </TreeItem>
+    );
 }

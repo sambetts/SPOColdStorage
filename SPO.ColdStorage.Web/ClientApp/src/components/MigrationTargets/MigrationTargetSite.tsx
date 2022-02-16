@@ -17,12 +17,12 @@ export const MigrationTargetSite: React.FC<Props> = (props) => {
             <span><Button onClick={() => props.removeSiteUrl(props.targetSite)}>Remove</Button></span>
             <ul>
 
-                {props.targetSite.siteFilterConfig && props.targetSite.siteFilterConfig!.listFilterConfig.length === 0 ?
+                {props.targetSite.siteFilterConfig?.listFilterConfig === null || props.targetSite.siteFilterConfig?.listFilterConfig === undefined || props.targetSite.siteFilterConfig.listFilterConfig!.length === 0 ?
                     <li>Include all lists</li>
                     :
                     (
                         <div className='siteLists'>
-                            {props.targetSite.siteFilterConfig!.listFilterConfig.map((listFolderConfig: ListFolderConfig) => (
+                            {props.targetSite.siteFilterConfig!.listFilterConfig!.map((listFolderConfig: ListFolderConfig) => (
                                 <li>{listFolderConfig.listTitle}</li>
                             ))}
 

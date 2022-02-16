@@ -16,27 +16,18 @@ interface Props {
 }
 
 export const SiteListsAndLibraries: React.FC<Props> = (props) => {
-    const [listConfig, setListConfig] = React.useState<ListFolderConfig[] | null>(null);
+    const [spLists, setSpLists] = React.useState<SPList[] | null>(null);
 
-    const getFilterConfigForSPList = React.useCallback((list: SPList): ListFolderConfig => {
+    const getFilterConfigForSPList = React.useCallback((list: SPList): ListFolderConfig | null => {
 
         // Find config from existing list
         let listInfo : ListFolderConfig | null = null;
-        props.targetSite.siteFilterConfig!.listFilterConfig.forEach((l: ListFolderConfig) => {
-            if (l.listTitle === list.Title) {
-                listInfo = l;
-            }
-        });
-
-        // Or we are not currently tracking this list. Return default with "includeInMigration: false"
-        if (!listInfo)
-        {
-            listInfo =
-            {
-                listTitle: list.Title,
-                folderWhiteList: [] as string[],
-                includeInMigration: false
-            };
+        if (props.targetSite.siteFilterConfig?.listFilterConfig && props.targetSite.siteFilterConfig.listFilterConfig) {
+            props.targetSite.siteFilterConfig.listFilterConfig!.forEach((l: ListFolderConfig) => {
+                if (l.listTitle === list.Title) {
+                    listInfo = l;
+                }
+            });
         }
         
 
@@ -62,14 +53,9 @@ export const SiteListsAndLibraries: React.FC<Props> = (props) => {
 
                 if (data.d?.results) {
 
-                    // Convert SP objects into our own ListFolderConfig, based on what lists are selected for migration
                     const lists: SPList[] = data.d.results;
-                    let allListConfig: ListFolderConfig[] = [];
-                    lists.forEach((list: SPList) => {
-                        allListConfig.push(getFilterConfigForSPList(list));
-                    });
-
-                    setListConfig(allListConfig);
+                    
+                    setSpLists(lists);
                 }
                 else {
                     alert('Unexpected response from SharePoint for lists: ' + responseText);
@@ -86,29 +72,29 @@ export const SiteListsAndLibraries: React.FC<Props> = (props) => {
         props.folderAdd(folder, list, props.targetSite);
     }
 
-    const listRemoved = (list : ListFolderConfig) => {
-        props.listRemoved(list, props.targetSite);
+    const listRemoved = (listName : string) => {
+        props.listRemoved(listName, props.targetSite);
     }
-    const listAdd = (list : ListFolderConfig) => {
-        props.listAdd(list, props.targetSite);
+    const listAdd = (listName : string) => {
+        props.listAdd(listName, props.targetSite);
     }
 
 
     return (
         <div>
-            {listConfig === null ?
+            {spLists === null ?
                 (
                     <div>Loading...</div>
                 )
                 :
                 (
                     <TreeView defaultCollapseIcon={<ExpandMoreIcon />} defaultExpandIcon={<ChevronRightIcon />} >
-                        {listConfig.map((listConfig: ListFolderConfig) =>
+                        {spLists.map((splist: SPList) =>
                         (
-                            <ListFolders spoAuthInfo={props.spoAuthInfo} targetList={listConfig} 
+                            <ListFolders spoAuthInfo={props.spoAuthInfo} list={splist} targetListConfig={getFilterConfigForSPList(splist)} 
                                 folderAdd={(f : string, list : ListFolderConfig)=> folderAdd(f, list)}
                                 folderRemoved={(f : string, list : ListFolderConfig)=> folderRemoved(f, list)}
-                                listAdd={() => listAdd(listConfig)} listRemoved={() => listRemoved(listConfig)}
+                                listAdd={() => listAdd(splist.Title)} listRemoved={() => listRemoved(splist.Title)}
                             />
                         )
                         )}
