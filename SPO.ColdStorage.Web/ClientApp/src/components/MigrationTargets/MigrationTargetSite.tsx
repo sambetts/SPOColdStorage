@@ -23,7 +23,7 @@ export const MigrationTargetSite: React.FC<Props> = (props) => {
                     (
                         <div className='siteLists'>
                             {props.targetSite.siteFilterConfig!.listFilterConfig!.map((listFolderConfig: ListFolderConfig) => (
-                                <li>{listFolderConfig.listTitle}</li>
+                                <li key={listFolderConfig.listTitle}>{listFolderConfig.listTitle}</li>
                             ))}
 
                         </div>

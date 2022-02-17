@@ -48,7 +48,7 @@ export const FolderList: React.FC<Props> = (props) => {
     return (
         <div>
             {folders.map((folder: string) =>
-                <TreeItem
+                <TreeItem key={folder}
                     nodeId={folder}
                     label={
                         <FormControlLabel

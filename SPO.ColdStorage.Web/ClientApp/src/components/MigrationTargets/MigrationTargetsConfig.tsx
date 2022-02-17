@@ -4,8 +4,10 @@ import { NewTargetForm } from './NewTargetForm'
 import { MigrationTargetSite } from './MigrationTargetSite'
 import Button from '@mui/material/Button';
 
-import { SiteBrowserDiag } from './SiteBrowser/SiteBrowserDiag';
+import { SelectedSiteBrowserDiag } from './SiteBrowser/SelectedSiteBrowserDiag';
 import { ListFolderConfig, TargetMigrationSite } from './TargetSitesInterfaces';
+
+import update from 'immutability-helper';
 
 export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
 
@@ -87,17 +89,49 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
     // Find the roit site
     const siteIdx = targetMigrationSites.indexOf(site);
     if (siteIdx > -1) {
-      var allButThisSite = targetMigrationSites.filter((value, i) => i !== siteIdx);
 
-      // Update model to send. Different from child state for display
-      const folderIdx = list.folderWhiteList.indexOf(folder);
-      if (folderIdx > -1) {
-        list.folderWhiteList = list.folderWhiteList.filter((value, i) => i !== folderIdx);
-        alert("Folder removed");
+      const listIdx = site.siteFilterConfig!.listFilterConfig.indexOf(list);
+      if (listIdx > -1) {
+
+        // Update model to send. Different from child state for display
+        const folderIdx = list.folderWhiteList.indexOf(folder);
+        if (folderIdx > -1) {
+
+          // Remove folder at specified location, in specified list, in specified site
+          var targetMigrationSitesUpdate = update(targetMigrationSites,
+            {
+              [siteIdx]:
+              {
+                siteFilterConfig:
+                {
+                  listFilterConfig:
+                  {
+                    [listIdx]:
+                    {
+                      folderWhiteList:
+                      {
+                        $splice: [[folderIdx, 1]]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          );
+
+          // Update all sites state
+          setTargetMigrationSites(targetMigrationSitesUpdate);
+
+          // Reset the dialogue site for UI
+          const updatedSite = targetMigrationSitesUpdate.find(s => s.rootURL === selectedSiteForDialogue?.rootURL);
+          if (updatedSite) {
+            setSelectedSiteForDialogue(updatedSite!);
+          }
+
+          alert("Folder removed");
+        }
       }
-      //[...f, newFilterVal]
     }
-
 
   }
   const folderAdd = (folder: string, list: ListFolderConfig, site: TargetMigrationSite) => {
@@ -167,7 +201,7 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
                 <div id='migrationTargets'>
                   {targetMigrationSites.map((targetMigrationSite: TargetMigrationSite) => (
                     <MigrationTargetSite token={props.token} targetSite={targetMigrationSite}
-                      removeSiteUrl={removeSiteUrl} selectLists={selectLists} />
+                      removeSiteUrl={removeSiteUrl} selectLists={selectLists} key={targetMigrationSite.rootURL} />
                   ))}
 
                 </div>
@@ -184,7 +218,7 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
       }
 
       {selectedSiteForDialogue &&
-        <SiteBrowserDiag token={props.token} targetSite={selectedSiteForDialogue}
+        <SelectedSiteBrowserDiag token={props.token} targetSite={selectedSiteForDialogue}
           open={selectedSiteForDialogue !== null} onClose={closeDiag}
           folderAdd={(f: string, list: ListFolderConfig, site: TargetMigrationSite) => folderAdd(f, list, site)}
           folderRemoved={(f: string, list: ListFolderConfig, site: TargetMigrationSite) => folderRemoved(f, list, site)}

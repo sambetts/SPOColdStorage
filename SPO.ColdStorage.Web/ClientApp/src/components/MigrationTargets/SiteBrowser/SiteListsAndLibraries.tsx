@@ -1,7 +1,7 @@
 import React from 'react';
 import { ListFolderConfig, TargetMigrationSite } from '../TargetSitesInterfaces';
 import { TreeView } from '@mui/lab';
-import { ListFolders } from "./ListAndFolders";
+import { ListAndFolders } from "./ListAndFolders";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { SPAuthInfo, SPList, SPListResponse } from './SPDefs';
@@ -17,13 +17,18 @@ interface Props {
 
 export const SiteListsAndLibraries: React.FC<Props> = (props) => {
     const [spLists, setSpLists] = React.useState<SPList[] | null>(null);
+    const [targetSite, setTargetSite] = React.useState<TargetMigrationSite>();
+
+    React.useEffect(() => {
+        setTargetSite(props.targetSite);
+    }, [props.targetSite]);
 
     const getFilterConfigForSPList = React.useCallback((list: SPList): ListFolderConfig | null => {
 
         // Find config from existing list
         let listInfo : ListFolderConfig | null = null;
-        if (props.targetSite.siteFilterConfig?.listFilterConfig && props.targetSite.siteFilterConfig.listFilterConfig) {
-            props.targetSite.siteFilterConfig.listFilterConfig!.forEach((l: ListFolderConfig) => {
+        if (targetSite!.siteFilterConfig?.listFilterConfig && targetSite!.siteFilterConfig.listFilterConfig) {
+            targetSite!.siteFilterConfig.listFilterConfig!.forEach((l: ListFolderConfig) => {
                 if (l.listTitle === list.Title) {
                     listInfo = l;
                 }
@@ -32,7 +37,9 @@ export const SiteListsAndLibraries: React.FC<Props> = (props) => {
         
 
         return listInfo;
-    }, [props.targetSite]);
+    }, [targetSite]);
+
+    
 
     React.useEffect(() => {
 
@@ -91,10 +98,11 @@ export const SiteListsAndLibraries: React.FC<Props> = (props) => {
                     <TreeView defaultCollapseIcon={<ExpandMoreIcon />} defaultExpandIcon={<ChevronRightIcon />} >
                         {spLists.map((splist: SPList) =>
                         (
-                            <ListFolders spoAuthInfo={props.spoAuthInfo} list={splist} targetListConfig={getFilterConfigForSPList(splist)} 
+                            <ListAndFolders spoAuthInfo={props.spoAuthInfo} list={splist} targetListConfig={getFilterConfigForSPList(splist)} 
                                 folderAdd={(f : string, list : ListFolderConfig)=> folderAdd(f, list)}
                                 folderRemoved={(f : string, list : ListFolderConfig)=> folderRemoved(f, list)}
                                 listAdd={() => listAdd(splist.Title)} listRemoved={() => listRemoved(splist.Title)}
+                                key={splist.Title}
                             />
                         )
                         )}

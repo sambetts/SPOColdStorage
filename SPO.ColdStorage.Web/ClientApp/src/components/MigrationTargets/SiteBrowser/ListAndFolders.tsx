@@ -15,7 +15,7 @@ interface Props {
     listAdd: Function
 }
 
-export const ListFolders: React.FC<Props> = (props) => {
+export const ListAndFolders: React.FC<Props> = (props) => {
     const [checked, setChecked] = React.useState<boolean>(false);
 
     const checkChange = (checked: boolean) => {

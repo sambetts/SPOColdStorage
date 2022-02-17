@@ -25,13 +25,19 @@ interface Props {
     listAdd: Function
 }
 
-export const SiteBrowserDiag: React.FC<Props> = (props) => {
+export const SelectedSiteBrowserDiag: React.FC<Props> = (props) => {
 
     const handleClose = () => {
         props.onClose();
     };
     const [spoAuthInfo, setSpoAuthInfo] = React.useState<SPAuthInfo | null>(null);
+    const [targetSite, setTargetSite] = React.useState<TargetMigrationSite>();
 
+    React.useEffect(() => {
+        setTargetSite(props.targetSite);
+    }, [props.targetSite]);
+
+    // Load SPO auth from API
     React.useEffect(() => {
 
         if (!spoAuthInfo) {
@@ -125,14 +131,14 @@ export const SiteBrowserDiag: React.FC<Props> = (props) => {
                                     <CloseIcon />
                                 </IconButton>
                                 <Typography sx={{ ml: 2, flex: 1 }} variant="h6" component="div">
-                                    Select Contents to Migrate: {props.targetSite.rootURL}
+                                    Select Contents to Migrate: {targetSite!.rootURL}
                                 </Typography>
                                 <Button autoFocus color="inherit" onClick={handleClose}>
                                     Save
                                 </Button>
                             </Toolbar>
                         </AppBar>
-                        <SiteListsAndLibraries spoAuthInfo={spoAuthInfo!} targetSite={props.targetSite} 
+                        <SiteListsAndLibraries spoAuthInfo={spoAuthInfo!} targetSite={targetSite!} 
                             folderAdd={(f : string, list : ListFolderConfig)=> folderAdd(f, list)}
                             folderRemoved={(f : string, list : ListFolderConfig)=> folderRemoved(f, list)}
                             listAdd={(list : ListFolderConfig) => listAdd(list)} 
