@@ -1,6 +1,6 @@
 ﻿using Azure.Storage.Blobs;
 using SPO.ColdStorage.Entities.Configuration;
-using SPO.ColdStorage.Migration.Engine.Model;
+using SPO.ColdStorage.Models;
 
 namespace SPO.ColdStorage.Migration.Engine.Migration
 {

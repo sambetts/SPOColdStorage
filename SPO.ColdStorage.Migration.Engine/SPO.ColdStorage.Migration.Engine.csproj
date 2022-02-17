@@ -23,6 +23,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SPO.ColdStorage.Entities\SPO.ColdStorage.Entities.csproj" />
+    <ProjectReference Include="..\SPO.ColdStorage.Models\SPO.ColdStorage.Models.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Model\" />
   </ItemGroup>
 
 </Project>

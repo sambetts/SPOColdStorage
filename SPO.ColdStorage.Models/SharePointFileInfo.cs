@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace SPO.ColdStorage.Migration.Engine.Model
+namespace SPO.ColdStorage.Models
 {
     /// <summary>
     /// SharePoint Online file metadata

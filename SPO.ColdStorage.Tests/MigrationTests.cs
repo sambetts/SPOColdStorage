@@ -1,14 +1,13 @@
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Identity.Client;
 using Microsoft.SharePoint.Client;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SPO.ColdStorage.Entities;
 using SPO.ColdStorage.Entities.Configuration;
 using SPO.ColdStorage.Migration.Engine;
 using SPO.ColdStorage.Migration.Engine.Migration;
-using SPO.ColdStorage.Migration.Engine.Model;
 using SPO.ColdStorage.Migration.Engine.Utils;
+using SPO.ColdStorage.Models;
 using System;
 using System.Linq;
 using System.Threading.Tasks;

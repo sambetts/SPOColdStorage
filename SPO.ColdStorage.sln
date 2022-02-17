@@ -19,6 +19,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{CCB51D98
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SPO.ColdStorage.LoadGenerator", "SPO.ColdStorage.LoadGenerator\SPO.ColdStorage.LoadGenerator.csproj", "{3315035E-170F-478B-8F86-D41D762FC3BF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SPO.ColdStorage.Models", "SPO.ColdStorage.Models\SPO.ColdStorage.Models.csproj", "{B2AFACD8-E3A2-42B3-9E43-3EC3582F62BC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -53,6 +55,10 @@ Global
 		{3315035E-170F-478B-8F86-D41D762FC3BF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3315035E-170F-478B-8F86-D41D762FC3BF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3315035E-170F-478B-8F86-D41D762FC3BF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B2AFACD8-E3A2-42B3-9E43-3EC3582F62BC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B2AFACD8-E3A2-42B3-9E43-3EC3582F62BC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B2AFACD8-E3A2-42B3-9E43-3EC3582F62BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B2AFACD8-E3A2-42B3-9E43-3EC3582F62BC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

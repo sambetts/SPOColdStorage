@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using SPO.ColdStorage.Entities;
 using SPO.ColdStorage.Entities.Configuration;
 using SPO.ColdStorage.Migration.Engine;
-using SPO.ColdStorage.Migration.Engine.Model;
+using SPO.ColdStorage.Models;
 using SPO.ColdStorage.Web.Models;
 
 namespace SPO.ColdStorage.Web.Controllers
@@ -72,12 +72,12 @@ namespace SPO.ColdStorage.Web.Controllers
 
         // GET: AppConfiguration/GetGetMigrationTargets
         [HttpGet("[action]")]
-        public async Task<ActionResult<IEnumerable<TargetMigrationSiteDTO>>> GetMigrationTargets()
+        public async Task<ActionResult<IEnumerable<SiteListFilterConfig>>> GetMigrationTargets()
         {
             var targets = await _context.TargetSharePointSites.ToListAsync();
-            var returnList = new List<TargetMigrationSiteDTO>();
+            var returnList = new List<SiteListFilterConfig>();
             foreach (var target in targets)
-                returnList.Add(new TargetMigrationSiteDTO(target));
+                returnList.Add(target.ToSiteListFilterConfig());
 
             return returnList;
         }
@@ -89,7 +89,7 @@ namespace SPO.ColdStorage.Web.Controllers
         /// <returns></returns>
         // POST: AppConfiguration/SetMigrationTargets
         [HttpPost("[action]")]
-        public async Task<ActionResult> SetMigrationTargets(List<TargetMigrationSiteDTO> targets)
+        public async Task<ActionResult> SetMigrationTargets(List<SiteListFilterConfig> targets)
         {
             if (targets == null || targets.Count == 0)
             {
@@ -133,8 +133,10 @@ namespace SPO.ColdStorage.Web.Controllers
                     return BadRequest($"Got '{ex.Message}' validating SPO site URL '{target}'. It's not a valid SharePoint site-collection URL?");
                 }
 
+                var dbObj = new Entities.DBEntities.TargetMigrationSite(target);
+
                 // Assuming no error, save to SQL
-                _context.TargetSharePointSites.Add(target);
+                _context.TargetSharePointSites.Add(dbObj);
             }
             await _context.SaveChangesAsync();
 

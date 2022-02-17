@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using SPO.ColdStorage.Entities;
 using SPO.ColdStorage.Entities.Configuration;
 using SPO.ColdStorage.Migration.Engine.Migration;
-using SPO.ColdStorage.Migration.Engine.Model;
+using SPO.ColdStorage.Models;
 
 namespace SPO.ColdStorage.Migration.Engine
 {

@@ -1,6 +1,6 @@
 ﻿using Microsoft.SharePoint.Client;
-using SPO.ColdStorage.Migration.Engine.Model;
 using SPO.ColdStorage.Migration.Engine.Utils;
+using SPO.ColdStorage.Models;
 
 namespace SPO.ColdStorage.Migration.Engine
 {

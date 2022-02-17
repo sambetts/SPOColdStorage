@@ -39,6 +39,7 @@
   <ItemGroup>
     <ProjectReference Include="..\SPO.ColdStorage.Entities\SPO.ColdStorage.Entities.csproj" />
     <ProjectReference Include="..\SPO.ColdStorage.Migration.Engine\SPO.ColdStorage.Migration.Engine.csproj" />
+    <ProjectReference Include="..\SPO.ColdStorage.Models\SPO.ColdStorage.Models.csproj" />
   </ItemGroup>
 
 </Project>

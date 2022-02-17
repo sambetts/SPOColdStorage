@@ -1,6 +1,6 @@
 ﻿using Microsoft.Identity.Client;
 using SPO.ColdStorage.Entities.Configuration;
-using SPO.ColdStorage.Migration.Engine.Model;
+using SPO.ColdStorage.Models;
 using System.Net.Http.Headers;
 
 namespace SPO.ColdStorage.Migration.Engine.Migration
