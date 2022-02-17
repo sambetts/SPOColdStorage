@@ -92,8 +92,11 @@ namespace SPO.ColdStorage.Tests
             Assert.IsTrue(cfg.IncludeFolderInMigration("Custom List", "Subfolder/Another subfolder"));
             Assert.IsFalse(cfg.IncludeFolderInMigration("Custom List", "Some other folder"));
 
-            // Root folder
-            Assert.IsTrue(cfg.IncludeFolderInMigration("Custom List", ""));
+            // Root folder not included if whitelist has items (without root in list)
+            Assert.IsFalse(cfg.IncludeFolderInMigration("Custom List", ""));
+
+            // Root folder is included if whitelist has no items
+            Assert.IsTrue(cfg.IncludeFolderInMigration("Documents", ""));
 
 
             // No config set

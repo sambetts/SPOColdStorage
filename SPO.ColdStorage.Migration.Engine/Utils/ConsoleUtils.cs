@@ -24,8 +24,8 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
 
         public static void PrintCommonStartupDetails()
         {
-            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-            Console.WriteLine($"{assembly.FullName}");
+            var assembly = System.Reflection.Assembly.GetEntryAssembly();
+            Console.WriteLine($"Start-up: '{assembly?.FullName}'.");
         }
     }
 }

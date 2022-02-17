@@ -26,8 +26,9 @@ namespace SPO.ColdStorage.Migration.Engine
             _receiver = _sbClient.CreateProcessor(_config.ServiceBusQueueName, new ServiceBusProcessorOptions
             {
                 MaxConcurrentCalls = 10,
+                PrefetchCount = 0,
                 ReceiveMode = ServiceBusReceiveMode.PeekLock,
-                MaxAutoLockRenewalDuration = TimeSpan.FromMinutes(4),       // Queue should be configured for 5 minute lock timeout
+                MaxAutoLockRenewalDuration = TimeSpan.FromMinutes(60),       // Queue should be configured for 5 minute lock timeout
                 AutoCompleteMessages = false
             });
         }
@@ -115,7 +116,7 @@ namespace SPO.ColdStorage.Migration.Engine
                 return;
             }
 
-            _ignoreDownloads.Add(sharePointFileToMigrate.ServerRelativeFilePath);
+            _ignoreDownloads.Add(thisFileRef);
 
             // Begin migration on common class
             using (var sharePointFileMigrator = new SharePointFileMigrator(_config, _tracer))
@@ -138,6 +139,9 @@ namespace SPO.ColdStorage.Migration.Engine
                         Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Error);
 
                     await sharePointFileMigrator.SaveErrorForFileMigrationToSql(ex, sharePointFileToMigrate);
+#if DEBUG
+                    throw;
+#endif
                 }
                 finally
                 {
@@ -162,6 +166,9 @@ namespace SPO.ColdStorage.Migration.Engine
                     {
                         base._tracer.TrackException(ex);
                         base._tracer.TrackTrace("Couldn't complete SB message: " + ex.Message);
+#if DEBUG
+                        throw;
+#endif
                     }
                     await sharePointFileMigrator.SaveSucessfulFileMigrationToSql(sharePointFileToMigrate);
                 }

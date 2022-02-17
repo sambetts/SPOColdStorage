@@ -46,8 +46,8 @@ namespace SPO.ColdStorage.Migration.Engine.Migration
                     // Get az blob MD5 & compare
                     var existingProps = await fileRef.GetPropertiesAsync();
 
-                    // For some reason, sometimes the hash is null
-                    var match = tempFileHash != null && existingProps.Value.ContentHash.SequenceEqual(tempFileHash);
+                    // For some reason, sometimes the SP hash is null
+                    var match = existingProps.Value.ContentHash != null && existingProps.Value.ContentHash.SequenceEqual(tempFileHash);
                     if (!match)
                         await fileRef.UploadAsync(fs, true);
                     else
