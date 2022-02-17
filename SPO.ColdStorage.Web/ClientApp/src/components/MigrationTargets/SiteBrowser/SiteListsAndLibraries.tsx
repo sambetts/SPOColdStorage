@@ -1,5 +1,5 @@
 import React from 'react';
-import { ListFolderConfig, TargetMigrationSite } from '../TargetSitesInterfaces';
+import { ListFolderConfig, SiteListFilterConfig } from '../TargetSitesInterfaces';
 import { TreeView } from '@mui/lab';
 import { ListAndFolders } from "./ListAndFolders";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -8,7 +8,7 @@ import { SPAuthInfo, SPList, SPListResponse } from './SPDefs';
 
 interface Props {
     spoAuthInfo: SPAuthInfo,
-    targetSite: TargetMigrationSite,
+    targetSite: SiteListFilterConfig,
     folderRemoved: Function,
     folderAdd: Function,
     listRemoved: Function,
@@ -17,7 +17,7 @@ interface Props {
 
 export const SiteListsAndLibraries: React.FC<Props> = (props) => {
     const [spLists, setSpLists] = React.useState<SPList[] | null>(null);
-    const [targetSite, setTargetSite] = React.useState<TargetMigrationSite>();
+    const [targetSite, setTargetSite] = React.useState<SiteListFilterConfig>();
 
     React.useEffect(() => {
         setTargetSite(props.targetSite);
@@ -27,8 +27,8 @@ export const SiteListsAndLibraries: React.FC<Props> = (props) => {
 
         // Find config from existing list
         let listInfo : ListFolderConfig | null = null;
-        if (targetSite!.siteFilterConfig?.listFilterConfig && targetSite!.siteFilterConfig.listFilterConfig) {
-            targetSite!.siteFilterConfig.listFilterConfig!.forEach((l: ListFolderConfig) => {
+        if (targetSite!.listFilterConfig && targetSite!.listFilterConfig) {
+            targetSite!.listFilterConfig!.forEach((l: ListFolderConfig) => {
                 if (l.listTitle === list.Title) {
                     listInfo = l;
                 }

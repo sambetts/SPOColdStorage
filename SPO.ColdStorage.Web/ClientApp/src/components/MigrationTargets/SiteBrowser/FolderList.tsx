@@ -71,7 +71,7 @@ export const FolderList: React.FC<Props> = (props) => {
                                 size="small"
                             />
                         }
-                        label="Press ENTER to add new folder path (e.g. 'path\path2'). End folder name with * to include sub-folders."
+                        label="Press ENTER to add new folder path (e.g. 'path/path2')."
                     />
                 }>
             </TreeItem>

@@ -8,13 +8,13 @@ import Typography from '@mui/material/Typography';
 import CloseIcon from '@mui/icons-material/Close';
 
 
-import { ListFolderConfig, TargetMigrationSite } from '../TargetSitesInterfaces';
+import { ListFolderConfig, SiteListFilterConfig } from '../TargetSitesInterfaces';
 import { SiteListsAndLibraries } from './SiteListsAndLibraries';
 import { SPAuthInfo } from './SPDefs';
 
 interface Props {
     token: string,
-    targetSite: TargetMigrationSite,
+    targetSite: SiteListFilterConfig,
     open: boolean,
     onClose: Function,
     folderRemoved: Function,
@@ -29,7 +29,7 @@ export const SelectedSiteBrowserDiag: React.FC<Props> = (props) => {
         props.onClose();
     };
     const [spoAuthInfo, setSpoAuthInfo] = React.useState<SPAuthInfo | null>(null);
-    const [targetSite, setTargetSite] = React.useState<TargetMigrationSite>();
+    const [targetSite, setTargetSite] = React.useState<SiteListFilterConfig>();
 
     React.useEffect(() => {
         setTargetSite(props.targetSite);

@@ -1,11 +1,8 @@
 
-interface TargetMigrationSite {
+interface SiteListFilterConfig {
     rootURL: string;
     siteFilterConfig?: SiteListFilterConfig;
-  }
-  
-  interface SiteListFilterConfig{
-    listFilterConfig: ListFolderConfig[]
+    listFilterConfig: ListFolderConfig[];
   }
   
   interface ListFolderConfig{
@@ -14,7 +11,6 @@ interface TargetMigrationSite {
   }
 
   export {
-    TargetMigrationSite,
     SiteListFilterConfig,
     ListFolderConfig
   }

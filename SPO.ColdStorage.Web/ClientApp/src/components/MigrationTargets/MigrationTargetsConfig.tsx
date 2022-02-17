@@ -5,17 +5,17 @@ import { MigrationTargetSite } from './MigrationTargetConfigSummary'
 import Button from '@mui/material/Button';
 
 import { SelectedSiteBrowserDiag } from './SiteBrowser/SelectedSiteBrowserDiag';
-import { ListFolderConfig, TargetMigrationSite } from './TargetSitesInterfaces';
+import { ListFolderConfig, SiteListFilterConfig } from './TargetSitesInterfaces';
 
 import update from 'immutability-helper';
 
 export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
 
   const [loading, setLoading] = React.useState<boolean>(false);
-  const [targetMigrationSites, setTargetMigrationSites] = React.useState<Array<TargetMigrationSite>>([]);
+  const [targetMigrationSites, setTargetMigrationSites] = React.useState<Array<SiteListFilterConfig>>([]);
 
   // Dialogue box for a site list-picker opens when this isn't null
-  const [selectedSiteForDialogue, setSelectedSiteForDialogue] = React.useState<TargetMigrationSite | null>(null);
+  const [selectedSiteForDialogue, setSelectedSiteForDialogue] = React.useState<SiteListFilterConfig | null>(null);
 
   const getMigrationTargets = React.useCallback(async (token) => {
 
@@ -29,7 +29,7 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
     }
     )
       .then(async response => {
-        const data: TargetMigrationSite[] = await response.json();
+        const data: SiteListFilterConfig[] = await response.json();
         return Promise.resolve(data);
       })
       .catch(err => {
@@ -47,7 +47,7 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
 
     // Load sites config from API
     getMigrationTargets(props.token)
-      .then((loadedTargetSites: TargetMigrationSite[]) => {
+      .then((loadedTargetSites: SiteListFilterConfig[]) => {
 
         setTargetMigrationSites(loadedTargetSites);
 
@@ -64,15 +64,15 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
       }
     });
 
-    const newSiteDef: TargetMigrationSite =
+    const newSiteDef: SiteListFilterConfig =
     {
       rootURL: newSiteUrl,
-      siteFilterConfig: { listFilterConfig: []}
+      listFilterConfig: []
     }
     setTargetMigrationSites(s => [...s, newSiteDef]);
   };
 
-  const removeSiteUrl = (selectedSite: TargetMigrationSite) => {
+  const removeSiteUrl = (selectedSite: SiteListFilterConfig) => {
     const idx = targetMigrationSites.indexOf(selectedSite);
     if (idx > -1) {
       targetMigrationSites.splice(idx);
@@ -80,13 +80,13 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
     }
   };
 
-  const selectLists = (selectedSite: TargetMigrationSite) => {
+  const selectLists = (selectedSite: SiteListFilterConfig) => {
     setSelectedSiteForDialogue(selectedSite);
   };
 
 
   // List & folder selection events
-  const folderRemoved = (folder: string, list: ListFolderConfig, site: TargetMigrationSite) => {
+  const folderRemoved = (folder: string, list: ListFolderConfig, site: SiteListFilterConfig) => {
 
     // Find the roit site
     const siteIdx = targetMigrationSites.indexOf(site);
@@ -104,16 +104,13 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
             {
               [siteIdx]:
               {
-                siteFilterConfig:
+                listFilterConfig:
                 {
-                  listFilterConfig:
+                  [listIdx]:
                   {
-                    [listIdx]:
+                    folderWhiteList:
                     {
-                      folderWhiteList:
-                      {
-                        $splice: [[folderIdx, 1]]
-                      }
+                      $splice: [[folderIdx, 1]]
                     }
                   }
                 }
@@ -134,12 +131,12 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
     }
 
   }
-  const folderAdd = (folder: string, list: ListFolderConfig, site: TargetMigrationSite) => {
+  const folderAdd = (folder: string, list: ListFolderConfig, site: SiteListFilterConfig) => {
 
     const siteIdx = targetMigrationSites.indexOf(site);
     if (siteIdx > -1) {
 
-      const listIdx = site.siteFilterConfig!.listFilterConfig.indexOf(list);
+      const listIdx = site.listFilterConfig.indexOf(list);
       if (listIdx > -1) {
 
         // Update model to send. Different from child state for display
@@ -151,16 +148,13 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
             {
               [siteIdx]:
               {
-                siteFilterConfig:
+                listFilterConfig:
                 {
-                  listFilterConfig:
+                  [listIdx]:
                   {
-                    [listIdx]:
+                    folderWhiteList:
                     {
-                      folderWhiteList:
-                      {
-                        $push: [folder]
-                      }
+                      $push: [folder]
                     }
                   }
                 }
@@ -177,13 +171,13 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
             setSelectedSiteForDialogue(updatedSite!);
           }
         }
-        else 
+        else
           alert('Folder already added');
       }
     }
 
   }
-  const listRemoved = (list: string, site: TargetMigrationSite) => {
+  const listRemoved = (list: string, site: SiteListFilterConfig) => {
 
     const siteIdx = targetMigrationSites.indexOf(site);
     if (siteIdx > -1) {
@@ -203,12 +197,9 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
             {
               [siteIdx]:
               {
-                siteFilterConfig:
+                listFilterConfig:
                 {
-                  listFilterConfig:
-                  {
-                    $splice: [[listIdx, 1]]
-                  }
+                  $splice: [[listIdx, 1]]
                 }
               }
             }
@@ -228,7 +219,7 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
       }
     }
   }
-  const listAdd = (list: string, site: TargetMigrationSite) => {
+  const listAdd = (list: string, site: SiteListFilterConfig) => {
 
     const siteIdx = targetMigrationSites.indexOf(site);
     if (siteIdx > -1) {
@@ -238,12 +229,9 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
         {
           [siteIdx]:
           {
-            siteFilterConfig:
+            listFilterConfig:
             {
-              listFilterConfig:
-              {
-                $push: [newList]
-              }
+              $push: [newList]
             }
           }
         }
@@ -268,14 +256,11 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + props.token,
       },
-      body: JSON.stringify(
-        {
-          TargetSites: targetMigrationSites
-        })
+      body: JSON.stringify(targetMigrationSites)
     }
     ).then(async response => {
       if (response.ok) {
-        alert('Success');
+        alert('Configuration saved to SQL');
       }
       else {
         alert(await response.text());
@@ -312,9 +297,9 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
               :
               (
                 <div id='migrationTargets'>
-                  {targetMigrationSites.map((targetMigrationSite: TargetMigrationSite) => (
-                    <MigrationTargetSite token={props.token} targetSite={targetMigrationSite}
-                      removeSiteUrl={removeSiteUrl} selectLists={selectLists} key={targetMigrationSite.rootURL} />
+                  {targetMigrationSites.map((SiteListFilterConfig: SiteListFilterConfig) => (
+                    <MigrationTargetSite token={props.token} targetSite={SiteListFilterConfig}
+                      removeSiteUrl={removeSiteUrl} selectLists={selectLists} key={SiteListFilterConfig.rootURL} />
                   ))}
 
                 </div>
@@ -333,10 +318,10 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
       {selectedSiteForDialogue &&
         <SelectedSiteBrowserDiag token={props.token} targetSite={selectedSiteForDialogue}
           open={selectedSiteForDialogue !== null} onClose={closeDiag}
-          folderAdd={(f: string, list: ListFolderConfig, site: TargetMigrationSite) => folderAdd(f, list, site)}
-          folderRemoved={(f: string, list: ListFolderConfig, site: TargetMigrationSite) => folderRemoved(f, list, site)}
-          listAdd={(list: string, site: TargetMigrationSite) => listAdd(list, site)}
-          listRemoved={(list: string, site: TargetMigrationSite) => listRemoved(list, site)}
+          folderAdd={(f: string, list: ListFolderConfig, site: SiteListFilterConfig) => folderAdd(f, list, site)}
+          folderRemoved={(f: string, list: ListFolderConfig, site: SiteListFilterConfig) => folderRemoved(f, list, site)}
+          listAdd={(list: string, site: SiteListFilterConfig) => listAdd(list, site)}
+          listRemoved={(list: string, site: SiteListFilterConfig) => listRemoved(list, site)}
         />
       }
     </div>

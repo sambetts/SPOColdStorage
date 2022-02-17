@@ -8,7 +8,7 @@ namespace SPO.ColdStorage.Models
     public class SiteListFilterConfig
     {
         [JsonIgnore]
-        public bool IsValid => !Uri.IsWellFormedUriString(RootURL, UriKind.Absolute);
+        public bool IsValid => Uri.IsWellFormedUriString(RootURL, UriKind.Absolute);
         public string RootURL { get; set; } = string.Empty;
         /// <summary>
         /// Lists to filter on. If empty will allow all lists
