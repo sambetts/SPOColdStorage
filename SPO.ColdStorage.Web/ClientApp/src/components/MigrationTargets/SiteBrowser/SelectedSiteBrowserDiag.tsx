@@ -6,8 +6,6 @@ import Toolbar from '@mui/material/Toolbar';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import CloseIcon from '@mui/icons-material/Close';
-import Slide from '@mui/material/Slide';
-import { TransitionProps } from '@mui/material/transitions';
 
 
 import { ListFolderConfig, TargetMigrationSite } from '../TargetSitesInterfaces';
@@ -82,16 +80,6 @@ export const SelectedSiteBrowserDiag: React.FC<Props> = (props) => {
     }, [props.targetSite.rootURL, props.token, spoAuthInfo]);
 
 
-    const DiagTransition = React.forwardRef(function Transition(
-        props: TransitionProps & {
-            children: React.ReactElement;
-        },
-        ref: React.Ref<unknown>,
-    ) {
-        return <Slide direction="up" ref={ref} {...props} />;
-    });
-
-
     const folderRemoved = (folder : string, list : ListFolderConfig) => {
         props.folderRemoved(folder, list, props.targetSite);
     }
@@ -118,8 +106,7 @@ export const SelectedSiteBrowserDiag: React.FC<Props> = (props) => {
                     <Dialog
                         fullScreen
                         open={props.open}
-                        onClose={handleClose}
-                        TransitionComponent={DiagTransition}>
+                        onClose={handleClose}>
 
                         <AppBar sx={{ position: 'relative' }}>
                             <Toolbar>

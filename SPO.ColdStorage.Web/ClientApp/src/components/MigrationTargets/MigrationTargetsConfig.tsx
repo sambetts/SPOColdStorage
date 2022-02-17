@@ -1,7 +1,7 @@
 import '../NavMenu.css';
 import React from 'react';
 import { NewTargetForm } from './NewTargetForm'
-import { MigrationTargetSite } from './MigrationTargetSite'
+import { MigrationTargetSite } from './MigrationTargetConfigSummary'
 import Button from '@mui/material/Button';
 
 import { SelectedSiteBrowserDiag } from './SiteBrowser/SelectedSiteBrowserDiag';
@@ -66,7 +66,8 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
 
     const newSiteDef: TargetMigrationSite =
     {
-      rootURL: newSiteUrl
+      rootURL: newSiteUrl,
+      siteFilterConfig: { listFilterConfig: []}
     }
     setTargetMigrationSites(s => [...s, newSiteDef]);
   };
@@ -84,6 +85,7 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
   };
 
 
+  // List & folder selection events
   const folderRemoved = (folder: string, list: ListFolderConfig, site: TargetMigrationSite) => {
 
     // Find the roit site
@@ -127,8 +129,6 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
           if (updatedSite) {
             setSelectedSiteForDialogue(updatedSite!);
           }
-
-          alert("Folder removed");
         }
       }
     }
@@ -144,7 +144,7 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
 
         // Update model to send. Different from child state for display
         const folderIdx = list.folderWhiteList.indexOf(folder);
-        if (folderIdx > -1) {
+        if (folderIdx === -1) {
 
           // Remove folder at specified location, in specified list, in specified site
           var targetMigrationSitesUpdate = update(targetMigrationSites,
@@ -176,14 +176,13 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
           if (updatedSite) {
             setSelectedSiteForDialogue(updatedSite!);
           }
-
-          alert("Folder added");
         }
+        else 
+          alert('Folder already added');
       }
     }
 
   }
-
   const listRemoved = (list: string, site: TargetMigrationSite) => {
 
     const siteIdx = targetMigrationSites.indexOf(site);
@@ -224,14 +223,11 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
           if (updatedSite) {
             setSelectedSiteForDialogue(updatedSite!);
           }
-
-          alert("List removed");
         }
 
       }
     }
   }
-
   const listAdd = (list: string, site: TargetMigrationSite) => {
 
     const siteIdx = targetMigrationSites.indexOf(site);
@@ -261,14 +257,12 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
       if (updatedSite) {
         setSelectedSiteForDialogue(updatedSite!);
       }
-
-      alert("List added");
     }
   }
 
   const saveAll = () => {
     setLoading(true);
-    fetch('migration', {
+    fetch('AppConfiguration/SetMigrationTargets', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

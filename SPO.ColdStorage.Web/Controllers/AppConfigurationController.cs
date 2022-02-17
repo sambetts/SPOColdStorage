@@ -88,7 +88,7 @@ namespace SPO.ColdStorage.Web.Controllers
         /// <param name="targets">List of sites + site config</param>
         /// <returns></returns>
         // POST: AppConfiguration/SetMigrationTargets
-        [HttpGet("[action]")]
+        [HttpPost("[action]")]
         public async Task<ActionResult> SetMigrationTargets(List<TargetMigrationSiteDTO> targets)
         {
             if (targets == null || targets.Count == 0)

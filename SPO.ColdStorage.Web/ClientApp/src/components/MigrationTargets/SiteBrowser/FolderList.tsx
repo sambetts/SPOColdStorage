@@ -1,8 +1,7 @@
 import React from 'react';
 
 import { TreeItem } from '@mui/lab';
-import { FormControlLabel, TextField } from "@mui/material";
-import { Button } from 'reactstrap';
+import { FormControlLabel, TextField, Button } from "@mui/material";
 
 interface Props {
     folderWhiteList: string[],
@@ -53,7 +52,7 @@ export const FolderList: React.FC<Props> = (props) => {
                     label={
                         <FormControlLabel
                             control={
-                                <Button onClick={() => removeFolder(folder)} />
+                                <Button onClick={() => removeFolder(folder)}>Delete</Button>
                             }
                             label={<>{folder}</>}
                             key={folder}
@@ -69,9 +68,10 @@ export const FolderList: React.FC<Props> = (props) => {
                         control={
                             <TextField value={newFilterVal} onKeyDown={event => keydown(event.keyCode)}
                                 onChange={event => newFolderValChange(event.currentTarget.value)}
+                                size="small"
                             />
                         }
-                        label="Add"
+                        label="Press ENTER to add new folder path (e.g. 'path\path2'). End folder name with * to include sub-folders."
                     />
                 }>
             </TreeItem>

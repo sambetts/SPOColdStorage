@@ -27,6 +27,7 @@ export class NewTargetForm extends React.Component<Props, State> {
         event.preventDefault();
         if (this.props.addUrlCallback) {
             this.props.addUrlCallback(this.state.rootUrl);
+            this.setState({ rootUrl: "" });
         }
     }
 
