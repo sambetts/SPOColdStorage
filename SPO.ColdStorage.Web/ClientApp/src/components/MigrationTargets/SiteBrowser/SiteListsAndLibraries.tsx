@@ -79,8 +79,8 @@ export const SiteListsAndLibraries: React.FC<Props> = (props) => {
         props.folderAdd(folder, list, props.targetSite);
     }
 
-    const listRemoved = (listName : string) => {
-        props.listRemoved(listName, props.targetSite);
+    const listRemoved = (list : string) => {
+        props.listRemoved(list, props.targetSite);
     }
     const listAdd = (listName : string) => {
         props.listAdd(listName, props.targetSite);

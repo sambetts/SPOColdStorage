@@ -99,7 +99,7 @@ export const SelectedSiteBrowserDiag: React.FC<Props> = (props) => {
         props.folderAdd(folder, list, props.targetSite);
     }
 
-    const listRemoved = (list : ListFolderConfig) => {
+    const listRemoved = (list : string) => {
         props.listRemoved(list, props.targetSite);
     }
     const listAdd = (list : ListFolderConfig) => {
@@ -142,7 +142,7 @@ export const SelectedSiteBrowserDiag: React.FC<Props> = (props) => {
                             folderAdd={(f : string, list : ListFolderConfig)=> folderAdd(f, list)}
                             folderRemoved={(f : string, list : ListFolderConfig)=> folderRemoved(f, list)}
                             listAdd={(list : ListFolderConfig) => listAdd(list)} 
-                            listRemoved={(list : ListFolderConfig) => listRemoved(list)}
+                            listRemoved={(list : string) => listRemoved(list)}
                         />
 
                     </Dialog>

@@ -135,16 +135,135 @@ export const MigrationTargetsConfig: React.FC<{ token: string }> = (props) => {
 
   }
   const folderAdd = (folder: string, list: ListFolderConfig, site: TargetMigrationSite) => {
-    // Update model to send. Different from child state for display
-    list.folderWhiteList.push(folder);
-    alert("Folder added");
+
+    const siteIdx = targetMigrationSites.indexOf(site);
+    if (siteIdx > -1) {
+
+      const listIdx = site.siteFilterConfig!.listFilterConfig.indexOf(list);
+      if (listIdx > -1) {
+
+        // Update model to send. Different from child state for display
+        const folderIdx = list.folderWhiteList.indexOf(folder);
+        if (folderIdx > -1) {
+
+          // Remove folder at specified location, in specified list, in specified site
+          var targetMigrationSitesUpdate = update(targetMigrationSites,
+            {
+              [siteIdx]:
+              {
+                siteFilterConfig:
+                {
+                  listFilterConfig:
+                  {
+                    [listIdx]:
+                    {
+                      folderWhiteList:
+                      {
+                        $push: [folder]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          );
+
+          // Update all sites state
+          setTargetMigrationSites(targetMigrationSitesUpdate);
+
+          // Reset the dialogue site for UI
+          const updatedSite = targetMigrationSitesUpdate.find(s => s.rootURL === selectedSiteForDialogue?.rootURL);
+          if (updatedSite) {
+            setSelectedSiteForDialogue(updatedSite!);
+          }
+
+          alert("Folder added");
+        }
+      }
+    }
+
   }
 
   const listRemoved = (list: string, site: TargetMigrationSite) => {
-    alert("List removed");
+
+    const siteIdx = targetMigrationSites.indexOf(site);
+    if (siteIdx > -1) {
+
+      let targetListConfig: ListFolderConfig | null = null;
+      site.siteFilterConfig!.listFilterConfig.forEach((listConfig: ListFolderConfig) => {
+        if (listConfig.listTitle === list) {
+          targetListConfig = listConfig;
+        }
+      });
+
+      if (targetListConfig) {
+        const listIdx = site.siteFilterConfig!.listFilterConfig.indexOf(targetListConfig);
+        if (listIdx > -1) {
+
+          var targetMigrationSitesUpdate = update(targetMigrationSites,
+            {
+              [siteIdx]:
+              {
+                siteFilterConfig:
+                {
+                  listFilterConfig:
+                  {
+                    $splice: [[listIdx, 1]]
+                  }
+                }
+              }
+            }
+          );
+
+
+          // Update all sites state
+          setTargetMigrationSites(targetMigrationSitesUpdate);
+
+          // Reset the dialogue site for UI
+          const updatedSite = targetMigrationSitesUpdate.find(s => s.rootURL === selectedSiteForDialogue?.rootURL);
+          if (updatedSite) {
+            setSelectedSiteForDialogue(updatedSite!);
+          }
+
+          alert("List removed");
+        }
+
+      }
+    }
   }
+
   const listAdd = (list: string, site: TargetMigrationSite) => {
-    alert("List added");
+
+    const siteIdx = targetMigrationSites.indexOf(site);
+    if (siteIdx > -1) {
+
+      const newList: ListFolderConfig = { listTitle: list, folderWhiteList: [] };
+      var targetMigrationSitesUpdate = update(targetMigrationSites,
+        {
+          [siteIdx]:
+          {
+            siteFilterConfig:
+            {
+              listFilterConfig:
+              {
+                $push: [newList]
+              }
+            }
+          }
+        }
+      );
+
+      // Update all sites state
+      setTargetMigrationSites(targetMigrationSitesUpdate);
+
+      // Reset the dialogue site for UI
+      const updatedSite = targetMigrationSitesUpdate.find(s => s.rootURL === selectedSiteForDialogue?.rootURL);
+      if (updatedSite) {
+        setSelectedSiteForDialogue(updatedSite!);
+      }
+
+      alert("List added");
+    }
   }
 
   const saveAll = () => {
