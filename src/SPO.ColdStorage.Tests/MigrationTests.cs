@@ -44,6 +44,32 @@ namespace SPO.ColdStorage.Tests
         }
         #endregion
 
+        [TestMethod]
+        public async Task CSOMv2Tests()
+        {
+            var app = await AuthUtils.GetNewClientApp(_config!);
+            var ctx = await AuthUtils.GetClientContext(app, _config!.BaseServerAddress, _config!.DevConfig.DefaultSharePointSite, _tracer);
+
+            // Upload a test file to SP
+            var targetList = ctx.Web.Lists.GetByTitle("Documents");
+
+            var fileTitle = $"unit-test file {DateTime.Now.Ticks}.txt";
+            var newItemId = await targetList.SaveFile(ctx, fileTitle, System.Text.Encoding.UTF8.GetBytes(FILE_CONTENTS));
+
+            // Update contents
+            await targetList.SaveFile(ctx, fileTitle, System.Text.Encoding.UTF8.GetBytes(FILE_CONTENTS + "v2"));
+
+            var c = new CSOMv2Helper(app, _config!.BaseServerAddress, _config!.DevConfig.DefaultSharePointSite, _tracer);
+            var uploaded = targetList.GetItemByUniqueId(newItemId);
+
+            await uploaded.FullLoadListItemDoc(ctx);
+
+
+            var analytics = await c.GetDriveItemAnalytics(uploaded.File.VroomDriveID, uploaded.File.VroomItemID);
+
+            // Unfortunately we won't get analytics for new items. Just check it works
+            Assert.IsTrue(analytics.IncompleteData!.ResultsPending);
+        }
 
         /// <summary>
         /// Runs nearly all tests without using Service Bus. Creates a new file in SP, then migrates it to Azure Blob, and verifies the contents.
@@ -60,7 +86,7 @@ namespace SPO.ColdStorage.Tests
             var targetList = ctx.Web.Lists.GetByTitle("Documents");
 
             var fileTitle = $"unit-test file {DateTime.Now.Ticks}.txt";
-            await targetList.SaveNewFile(ctx, fileTitle, System.Text.Encoding.UTF8.GetBytes(FILE_CONTENTS));
+            await targetList.SaveFile(ctx, fileTitle, System.Text.Encoding.UTF8.GetBytes(FILE_CONTENTS));
 
 
             // Discover file in SP with crawler
@@ -81,7 +107,7 @@ namespace SPO.ColdStorage.Tests
             var blobClient = containerClient.GetBlobClient(discoveredFile.ServerRelativeFilePath);
 
             await blobClient.DownloadToAsync(tempLocalFile);
-            
+
 
             // Check az blob file contents matches original data
             var azDownloadedFile = System.IO.File.ReadAllText(tempLocalFile);
@@ -104,7 +130,7 @@ namespace SPO.ColdStorage.Tests
             // Upload a test file to SP
             var targetList = ctx.Web.Lists.GetByTitle("Documents");
             var fileTitle = $"unit-test file {DateTime.Now.Ticks}.txt";
-            await targetList.SaveNewFile(ctx, fileTitle, System.Text.Encoding.UTF8.GetBytes(FILE_CONTENTS));
+            await targetList.SaveFile(ctx, fileTitle, System.Text.Encoding.UTF8.GetBytes(FILE_CONTENTS));
 
             // Prepare for file migration
             var discoveredFile = await GetFromIndex(ctx, fileTitle, targetList);
@@ -124,7 +150,7 @@ namespace SPO.ColdStorage.Tests
             Assert.IsFalse(needsMigratingPostMigration);
 
             // Update file with new content and recrawl
-            await targetList.SaveNewFile(ctx, fileTitle, System.Text.Encoding.UTF8.GetBytes(FILE_CONTENTS + " + extra data"));
+            await targetList.SaveFile(ctx, fileTitle, System.Text.Encoding.UTF8.GetBytes(FILE_CONTENTS + " + extra data"));
             discoveredFile = await GetFromIndex(ctx, fileTitle, targetList);
 
             // Now the file's been updated, it should need a new migration
@@ -152,8 +178,8 @@ namespace SPO.ColdStorage.Tests
         public async Task SharePointFileDownloaderTests()
         {
             var testMsg = new SharePointFileInfo
-            { 
-                SiteUrl = _config!.DevConfig.DefaultSharePointSite, 
+            {
+                SiteUrl = _config!.DevConfig.DefaultSharePointSite,
                 WebUrl = _config!.DevConfig.DefaultSharePointSite,
                 ServerRelativeFilePath = "/sites/MigrationHost/Shared%20Documents/Blank%20Office%20PPT.pptx"
             };

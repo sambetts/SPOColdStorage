@@ -1,9 +1,10 @@
 ﻿
 using SPO.ColdStorage.Migration.Engine;
+using SPO.ColdStorage.Migration.Engine.SnapshotBuilder;
 using SPO.ColdStorage.Migration.Engine.Utils;
 
 Console.WriteLine("SPO Cold Storage - Site Snapshot Builder");
-Console.WriteLine("This app will listen for messages from service-bus and handle them when they arrive, untill you close this application.");
+Console.WriteLine("This app will build new space snapshots for configured site-collections.");
 
 var config = ConsoleUtils.GetConfigurationWithDefaultBuilder();
 ConsoleUtils.PrintCommonStartupDetails();
@@ -17,5 +18,5 @@ if (config.HaveAppInsightsConfigured)
 else
     tracer = DebugTracer.ConsoleOnlyTracer();
 
-var listener = new ServiceBusMigrationListener(config, tracer);
-await listener.ListenForFilesToMigrate();
+var analyser = new TenantModelBuilder(config, tracer);
+await analyser.Build();

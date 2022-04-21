@@ -123,7 +123,7 @@ namespace SPO.ColdStorage.LoadGenerator
 
         private async Task AddFileToDocLib(List list, ClientContext ctx)
         {
-            await list.SaveNewFile(ctx, $"test{DateTime.Now.Ticks}.txt", Encoding.UTF8.GetBytes("bum"));
+            await list.SaveFile(ctx, $"test{DateTime.Now.Ticks}.txt", Encoding.UTF8.GetBytes("bum"));
         }
 
         private async Task AddFileToCustomList(List list, ClientContext ctx)

@@ -111,7 +111,9 @@ namespace SPO.ColdStorage.Migration.Engine
                                         item => item["Modified"],
                                         item => item["Editor"],
                                         item => item.File.Exists,
-                                        item => item.File.ServerRelativeUrl
+                                        item => item.File.ServerRelativeUrl,
+                                        item => item.File.VroomItemID,
+                                        item => item.File.VroomDriveID
                                     )
                                 );
                 }
@@ -166,29 +168,25 @@ namespace SPO.ColdStorage.Migration.Engine
         /// </summary>
         private async Task<SharePointFileInfo?> ProcessDocLibItem(ListItem docListItem, string listServerRelativeUrl, ListFolderConfig listFolderConfig)
         {
-            switch (docListItem.FileSystemObjectType)
+            if (docListItem.FileSystemObjectType == FileSystemObjectType.File && docListItem.File.Exists)
             {
-                case FileSystemObjectType.File:
 
-                    if (docListItem.File.Exists)
+                var foundFileInfo = GetSharePointFileInfo(docListItem, docListItem.File.ServerRelativeUrl, listServerRelativeUrl);
+                if (listFolderConfig.IncludeFolder(foundFileInfo))
+                {
+                    if (_foundFileToMigrateCallback != null)
                     {
-                        var foundFileInfo = GetSharePointFileInfo(docListItem, docListItem.File.ServerRelativeUrl, listServerRelativeUrl);
-                        if (listFolderConfig.IncludeFolder(foundFileInfo))
-                        {
-                            if (_foundFileToMigrateCallback != null)
-                            {
-                                await this._foundFileToMigrateCallback(foundFileInfo);
-                            }
-                        }
-                        else
-                        {
-#if DEBUG
-                            Console.WriteLine($"DEBUG: Ignoring doc {foundFileInfo.ServerRelativeFilePath}");
-#endif
-                        }
-                        return foundFileInfo;
+                        await this._foundFileToMigrateCallback(foundFileInfo);
                     }
-                    break;
+                }
+                else
+                {
+#if DEBUG
+                    Console.WriteLine($"DEBUG: Ignoring doc {foundFileInfo.ServerRelativeFilePath}");
+#endif
+                }
+                return foundFileInfo;
+
             }
 
             return null;
@@ -256,7 +254,7 @@ namespace SPO.ColdStorage.Migration.Engine
                 if (dir!.StartsWith(listServerRelativeUrl))
                 {
                     // Truncate list URL from dir value of item
-                     dir = dir.Substring(listServerRelativeUrl.Length).TrimStart("/".ToCharArray());
+                    dir = dir.Substring(listServerRelativeUrl.Length).TrimStart("/".ToCharArray());
                 }
             }
             else
@@ -271,15 +269,35 @@ namespace SPO.ColdStorage.Migration.Engine
                 if (authorFieldObj != null)
                 {
                     var authorVal = (FieldUserValue)authorFieldObj;
-                    return new SharePointFileInfo
+
+                    // Doc or list-item?
+                    if (string.IsNullOrEmpty(item.File?.VroomDriveID) || string.IsNullOrEmpty(item.File?.VroomItemID))
                     {
-                        Author = !string.IsNullOrEmpty(authorVal.Email) ? authorVal.Email : authorVal.LookupValue,
-                        ServerRelativeFilePath = url,
-                        LastModified = dt,
-                        WebUrl = _spClient.Web.Url,
-                        SiteUrl = _spClient.Site.Url,
-                        Subfolder = dir.TrimEnd("/".ToCharArray())
-                    };
+                        // No Graph IDs - probably a list item
+                        return new SharePointFileInfo
+                        {
+                            Author = !string.IsNullOrEmpty(authorVal.Email) ? authorVal.Email : authorVal.LookupValue,
+                            ServerRelativeFilePath = url,
+                            LastModified = dt,
+                            WebUrl = _spClient.Web.Url,
+                            SiteUrl = _spClient.Site.Url,
+                            Subfolder = dir.TrimEnd("/".ToCharArray())
+                        };
+                    }
+                    else
+                    {
+                        return new DriveItemSharePointFileInfo
+                        {
+                            Author = !string.IsNullOrEmpty(authorVal.Email) ? authorVal.Email : authorVal.LookupValue,
+                            ServerRelativeFilePath = url,
+                            LastModified = dt,
+                            WebUrl = _spClient.Web.Url,
+                            SiteUrl = _spClient.Site.Url,
+                            Subfolder = dir.TrimEnd("/".ToCharArray()),
+                            GraphItemId = item.File.VroomItemID,
+                            DriveId = item.File.VroomDriveID,
+                        };
+                    }
                 }
                 else
                 {

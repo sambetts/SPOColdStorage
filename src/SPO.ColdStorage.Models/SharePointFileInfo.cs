@@ -91,4 +91,10 @@ namespace SPO.ColdStorage.Models
             }
         }
     }
+
+    public class DriveItemSharePointFileInfo : SharePointFileInfo
+    {
+        public string DriveId { get; set; } = string.Empty;
+        public string GraphItemId { get; set; } = string.Empty;
+    }
 }
