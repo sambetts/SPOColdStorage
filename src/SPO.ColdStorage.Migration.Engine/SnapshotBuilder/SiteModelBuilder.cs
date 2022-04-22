@@ -2,28 +2,29 @@
 using SPO.ColdStorage.Entities;
 using SPO.ColdStorage.Entities.Configuration;
 using SPO.ColdStorage.Entities.DBEntities;
+using SPO.ColdStorage.Migration.Engine.Model;
 using SPO.ColdStorage.Migration.Engine.Utils;
 using SPO.ColdStorage.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 {
+    /// <summary>
+    /// Builds a snapshot for a single site
+    /// </summary>
     public class SiteModelBuilder : BaseComponent, IDisposable
     {
+        #region Privates & Constructors
+
         private readonly TargetMigrationSite site;
         private readonly SPOColdStorageDbContext _db;
         private readonly SiteListFilterConfig _siteFilterConfig;
-        private readonly SiteModel _model;
+        private readonly SiteSnapshotModel _model;
         private readonly CSOMv2Helper _CSOMv2Helper;
         public SiteModelBuilder(IConfidentialClientApplication app, Config config, DebugTracer debugTracer, TargetMigrationSite site) : base(config, debugTracer)
         {
             this.site = site;
             _db = new SPOColdStorageDbContext(this._config);
-            _model = new SiteModel();
+            _model = new SiteSnapshotModel();
             _CSOMv2Helper = new CSOMv2Helper(app, config.BaseServerAddress, site.RootURL, _tracer);
 
             // Figure out what to analyse
@@ -48,8 +49,14 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 _siteFilterConfig = siteFilterConfig;
             }
         }
+        public void Dispose()
+        {
+            _db.Dispose();
+        }
 
-        public async Task<SiteModel> Build()
+        #endregion
+
+        public async Task<SiteSnapshotModel> Build()
         {
             if (!_model.Finished.HasValue)
             {
@@ -61,10 +68,6 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             return _model;
         }
 
-        public void Dispose()
-        {
-            _db.Dispose();
-        }
 
         private async Task Crawler_SharePointFileFound(SharePointFileInfo arg)
         {
@@ -74,6 +77,20 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             {
                 var driveArg = (DriveItemSharePointFileInfo)arg;
                 var stats = await _CSOMv2Helper.GetDriveItemAnalytics(driveArg.DriveId, driveArg.GraphItemId);
+
+                newFile.FileType = FileType.DocumentLibraryFile;
+                if (stats.AccessStats != null)
+                {
+                    newFile.AccessCount = stats.AccessStats.ActionCount;
+                }
+                else
+                {
+                    newFile.AccessCount = null;
+                }
+            }
+            else
+            {
+                newFile.FileType = FileType.ListItemAttachement;
             }
 
             _model.Files.Add(newFile);
@@ -81,18 +98,5 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         }
     }
 
-    public class SiteModel
-    {
-        public DateTime Started { get; set; } = DateTime.Now;
-        public DateTime? Finished { get; set; }
-
-        public TargetMigrationSite Site { get; set; } = new TargetMigrationSite();
-
-        public List<SiteFile> Files { get; set; } = new List<SiteFile>();
-    }
-    public class SiteFile
-    {
-        public string FileName { get; set; } = string.Empty;
-    }
 
 }
