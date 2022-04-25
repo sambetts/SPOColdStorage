@@ -20,6 +20,10 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         private readonly SiteListFilterConfig _siteFilterConfig;
         private readonly SiteSnapshotModel _model;
         private readonly CSOMv2Helper _CSOMv2Helper;
+        const int MAX_BATCH_PETITIONS = 20;
+
+        private List<GraphFileInfo> _pendingMetaFiles = new();
+        private SemaphoreSlim _backgroundTaskLock = new(1, 1);
         public SiteModelBuilder(IConfidentialClientApplication app, Config config, DebugTracer debugTracer, TargetMigrationSite site) : base(config, debugTracer)
         {
             this.site = site;
@@ -76,6 +80,24 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             if (arg is DriveItemSharePointFileInfo)
             {
                 var driveArg = (DriveItemSharePointFileInfo)arg;
+
+                var graphInfo = new GraphFileInfo { DriveId = driveArg.DriveId, ItemId = driveArg.GraphItemId };
+                await _backgroundTaskLock.WaitAsync();
+                try
+                {
+                    _pendingMetaFiles.Add(graphInfo);
+                    if (_pendingMetaFiles.Count >= MAX_BATCH_PETITIONS)
+                    {
+                        var files = new List<GraphFileInfo>(_pendingMetaFiles);
+                        _pendingMetaFiles.Clear();
+                        await ProcessMetaChunk(files);
+                    }
+                }
+                finally
+                {
+                    _backgroundTaskLock.Release();
+                }
+
                 var stats = await _CSOMv2Helper.GetDriveItemAnalytics(driveArg.DriveId, driveArg.GraphItemId);
 
                 newFile.FileType = FileType.DocumentLibraryFile;
@@ -95,6 +117,11 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
             _model.Files.Add(newFile);
             Console.WriteLine($"lol {arg.FullSharePointUrl}");
+        }
+
+        private Task ProcessMetaChunk(List<GraphFileInfo> files)
+        {
+            throw new NotImplementedException();
         }
     }
 

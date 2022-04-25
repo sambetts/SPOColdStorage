@@ -1,5 +1,7 @@
+using Azure.Identity;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Graph;
 using Microsoft.SharePoint.Client;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SPO.ColdStorage.Entities;
@@ -66,6 +68,24 @@ namespace SPO.ColdStorage.Tests
 
 
             var analytics = await c.GetDriveItemAnalytics(uploaded.File.VroomDriveID, uploaded.File.VroomItemID);
+
+            // Unfortunately we won't get analytics for new items. Just check it works
+            Assert.IsTrue(analytics.IncompleteData!.ResultsPending);
+
+            var creds = new ClientSecretCredential(_config.AzureAdConfig.TenantId, _config.AzureAdConfig.ClientID, _config.AzureAdConfig.Secret);
+            var gc = new GraphServiceClient(creds);
+            
+
+            var graphFileInfoList = new System.Collections.Generic.List<Migration.Engine.Model.GraphFileInfo>() 
+            { 
+                new Migration.Engine.Model.GraphFileInfo 
+                { 
+                    DriveId = uploaded.File.VroomDriveID,
+                    ItemId = uploaded.File.VroomItemID
+                } 
+            };
+
+            var batchAnalytics = await graphFileInfoList.Batch(gc);
 
             // Unfortunately we won't get analytics for new items. Just check it works
             Assert.IsTrue(analytics.IncompleteData!.ResultsPending);
@@ -166,7 +186,7 @@ namespace SPO.ColdStorage.Tests
             Assert.IsFalse(needsMigratingPostMigration);
         }
 
-        async Task<SharePointFileInfo?> GetFromIndex(ClientContext ctx, string fileTitle, List targetList)
+        async Task<SharePointFileInfo?> GetFromIndex(ClientContext ctx, string fileTitle, Microsoft.SharePoint.Client.List targetList)
         {
             var crawler = new SiteListsAndLibrariesCrawler(ctx, _tracer);
             var allResults = await crawler.CrawlList(targetList);

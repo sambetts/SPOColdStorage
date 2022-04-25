@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Net.Http.Headers;
+using System.Text.Json;
 
 namespace SPO.ColdStorage.Migration.Engine.Utils
 {
@@ -30,13 +27,74 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
                 throw new ArgumentNullException(nameof(debugTracer));
             }
 
+            var response = await ExecuteHttpCallWithThrottleRetries(async () => await httpClient.GetAsync(url, completionOption), debugTracer);
+
+
+            return response!;
+        }
+
+        public static async Task<HttpResponseMessage> PostAsyncWithThrottleRetries(this HttpClient httpClient, string url, object body, DebugTracer debugTracer)
+        {
+            if (httpClient is null)
+            {
+                throw new ArgumentNullException(nameof(httpClient));
+            }
+
+            if (string.IsNullOrEmpty(url))
+            {
+                throw new ArgumentException($"'{nameof(url)}' cannot be null or empty.", nameof(url));
+            }
+
+            if (debugTracer is null)
+            {
+                throw new ArgumentNullException(nameof(debugTracer));
+            }
+
+            var payload = JsonSerializer.Serialize(body);
+            var httpContent = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+
+            var response = await ExecuteHttpCallWithThrottleRetries(async () => await httpClient.PostAsync(url, httpContent), debugTracer);
+
+            return response;
+        }
+
+
+        public static async Task<HttpResponseMessage> PostAsyncWithThrottleRetries(this HttpClient httpClient, string url, string bodyContent, string mimeType, string boundary, DebugTracer debugTracer)
+        {
+            if (httpClient is null)
+            {
+                throw new ArgumentNullException(nameof(httpClient));
+            }
+
+            if (string.IsNullOrEmpty(url))
+            {
+                throw new ArgumentException($"'{nameof(url)}' cannot be null or empty.", nameof(url));
+            }
+
+            if (debugTracer is null)
+            {
+                throw new ArgumentNullException(nameof(debugTracer));
+            }
+
+            var body = new StringContent(bodyContent);
+            var header = new MediaTypeHeaderValue(mimeType);
+            header.Parameters.Add(new NameValueHeaderValue("boundary", boundary));
+            body.Headers.ContentType = header;
+
+            var response = await ExecuteHttpCallWithThrottleRetries(async () => await httpClient.PostAsync(url, body), debugTracer);
+
+            return response;
+        }
+
+        public static async Task<HttpResponseMessage> ExecuteHttpCallWithThrottleRetries(Func<Task<HttpResponseMessage>> httpAction, DebugTracer debugTracer)
+        {
             HttpResponseMessage? response = null;
             int retries = 0;
             bool retryDownload = true;
             while (retryDownload)
             {
                 // Get response but don't buffer full content (which will buffer overlflow for large files)
-                response = await httpClient.GetAsync(url, completionOption);
+                response = await httpAction();
 
                 if (!response.IsSuccessStatusCode && response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 {

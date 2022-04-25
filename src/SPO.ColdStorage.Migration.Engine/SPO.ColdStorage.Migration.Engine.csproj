@@ -17,6 +17,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Graph" Version="4.25.0" />
     <PackageReference Include="Microsoft.SharePointOnline.CSOM" Version="16.1.21909.12000" />
   </ItemGroup>
 
