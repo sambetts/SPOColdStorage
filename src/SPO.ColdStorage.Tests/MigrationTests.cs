@@ -47,7 +47,7 @@ namespace SPO.ColdStorage.Tests
         #endregion
 
         [TestMethod]
-        public async Task CSOMv2Tests()
+        public async Task GetDriveItemAnalyticsTests()
         {
             var app = await AuthUtils.GetNewClientApp(_config!);
             var ctx = await AuthUtils.GetClientContext(app, _config!.BaseServerAddress, _config!.DevConfig.DefaultSharePointSite, _tracer);
@@ -74,7 +74,9 @@ namespace SPO.ColdStorage.Tests
 
             var creds = new ClientSecretCredential(_config.AzureAdConfig.TenantId, _config.AzureAdConfig.ClientID, _config.AzureAdConfig.Secret);
             var gc = new GraphServiceClient(creds);
-            
+
+            // Test batch method
+            var driveItems = await gc.Drives[uploaded.File.VroomDriveID].Root.Children.Request().GetAsync();
 
             var graphFileInfoList = new System.Collections.Generic.List<Migration.Engine.Model.GraphFileInfo>() 
             { 
@@ -84,8 +86,10 @@ namespace SPO.ColdStorage.Tests
                     ItemId = uploaded.File.VroomItemID
                 } 
             };
+            var graphFiles = driveItems.Select(d => new Migration.Engine.Model.GraphFileInfo { DriveId = uploaded.File.VroomDriveID, ItemId = d.Id });
+            graphFileInfoList.AddRange(graphFiles);
 
-            var batchAnalytics = await graphFileInfoList.Batch(gc);
+            var batchAnalytics = await graphFileInfoList.GetDriveItemsAnalytics(gc);
 
             // Unfortunately we won't get analytics for new items. Just check it works
             Assert.IsTrue(analytics.IncompleteData!.ResultsPending);
