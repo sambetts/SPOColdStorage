@@ -89,7 +89,7 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
         public static async Task<HttpResponseMessage> ExecuteHttpCallWithThrottleRetries(Func<Task<HttpResponseMessage>> httpAction, DebugTracer debugTracer)
         {
             HttpResponseMessage? response = null;
-            int retries = 0;
+            int retries = 0, secondsToWait = 0;
             bool retryDownload = true;
             while (retryDownload)
             {
@@ -98,21 +98,36 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
 
                 if (!response.IsSuccessStatusCode && response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 {
-                    // Worth trying any more?
-                    if (retries == Constants.MAX_SPO_API_RETRIES)
+                    // Do we have a "retry-after" header?
+                    var waitValue = response.GetRetryAfterHeaderSeconds();
+                    if (waitValue.HasValue)
                     {
-                        debugTracer.TrackTrace($"{Constants.THROTTLE_ERROR} downloading response from SPO REST. Maximum retry attempts {Constants.MAX_SPO_API_RETRIES} has been attempted.",
-                            Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Error);
+                        secondsToWait = waitValue.Value;
+                        debugTracer.TrackTrace($"{Constants.THROTTLE_ERROR} downloading from REST. Waiting {secondsToWait} seconds to try again (from 'retry-after' header)...",
+                            Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Warning);
+                    }
+                    else
+                    {
+                        // No retry value given so we have to guess. Loop with ever-increasing wait.
+                        if (retries == Constants.MAX_SPO_API_RETRIES)
+                        {
+                            // Don't try forever
+                            debugTracer.TrackTrace($"{Constants.THROTTLE_ERROR} downloading response from REST. Maximum retry attempts {Constants.MAX_SPO_API_RETRIES} has been attempted.",
+                                Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Error);
 
-                        // Allow normal HTTP exception & abort download
-                        response.EnsureSuccessStatusCode();
+                            // Allow normal HTTP exception & abort download
+                            response.EnsureSuccessStatusCode();
+                        }
+
+                        // We've not reached throttling max retries...keep retrying
+                        retries++;
+                        debugTracer.TrackTrace($"{Constants.THROTTLE_ERROR} downloading from REST. Waiting {retries} seconds to try again...",
+                            Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Warning);
+
+                        secondsToWait = retries;
                     }
 
-                    // We've not reached throttling max retries...keep retrying
-                    retries++;
-                    debugTracer.TrackTrace($"{Constants.THROTTLE_ERROR} downloading from SPO REST. Waiting {retries} seconds to try again...",
-                        Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Warning);
-                    await Task.Delay(1000 * retries);
+                    await Task.Delay(1000 * secondsToWait);
                 }
 
                 // Sucess
@@ -120,6 +135,24 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
             }
 
             return response!;
+        }
+
+
+        public static int? GetRetryAfterHeaderSeconds(this HttpResponseMessage response)
+        {
+            int responseWaitVal = 0;
+            response.Headers.TryGetValues("Retry-After", out var r);
+
+            if (r != null)
+            foreach (var retryAfterHeaderVal in r)
+            {
+                if (int.TryParse(retryAfterHeaderVal, out responseWaitVal))
+                {
+                    return responseWaitVal;
+                }
+            }
+
+            return null;
         }
     }
 }

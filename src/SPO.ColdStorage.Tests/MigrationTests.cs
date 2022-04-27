@@ -89,7 +89,7 @@ namespace SPO.ColdStorage.Tests
             var graphFiles = driveItems.Select(d => new Migration.Engine.Model.GraphFileInfo { DriveId = uploaded.File.VroomDriveID, ItemId = d.Id });
             graphFileInfoList.AddRange(graphFiles);
 
-            var batchAnalytics = await graphFileInfoList.GetDriveItemsAnalytics(gc);
+            var batchAnalytics = await graphFileInfoList.GetDriveItemsAnalytics(gc, _tracer);
 
             // Unfortunately we won't get analytics for new items. Just check it works
             Assert.IsTrue(analytics.IncompleteData!.ResultsPending);
