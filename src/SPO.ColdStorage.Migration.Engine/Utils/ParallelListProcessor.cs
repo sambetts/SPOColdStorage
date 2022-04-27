@@ -36,7 +36,7 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
         /// From a complete list, load in parallel chunks. Blocks until all tasks are complete.
         /// </summary>
         /// <param name="processListChunkDelegate">Function delegate for processing a chunk of all items + thread index. Must return Task</param>
-        public async Task ProcessListInParallel(IEnumerable<T> allItems, Func<List<T>, int, Task> processListChunkDelegate, Action<int> startingDelegate)
+        public async Task ProcessListInParallel(IEnumerable<T> allItems, Func<List<T>, int, Task> processListChunkDelegate, Action<int>? startingDelegate)
         {
             if (allItems is null)
             {
@@ -80,10 +80,6 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
 
                 // Load chunk via delegate
                 tasks.Add(processListChunkDelegate(threadListChunk, threadIndex));
-#if DEBUG
-                Console.WriteLine($"DEBUG: +{threadIndex}/{threadsNeeded} spawned.");
-#endif
-
             }
 
             // Block for all threads

@@ -75,24 +75,17 @@ namespace SPO.ColdStorage.Tests
             var creds = new ClientSecretCredential(_config.AzureAdConfig.TenantId, _config.AzureAdConfig.ClientID, _config.AzureAdConfig.Secret);
             var gc = new GraphServiceClient(creds);
 
-            // Test batch method
+            // Test batch method with files in doc-lib
             var driveItems = await gc.Drives[uploaded.File.VroomDriveID].Root.Children.Request().GetAsync();
 
-            var graphFileInfoList = new System.Collections.Generic.List<Migration.Engine.Model.GraphFileInfo>() 
-            { 
-                new Migration.Engine.Model.GraphFileInfo 
-                { 
-                    DriveId = uploaded.File.VroomDriveID,
-                    ItemId = uploaded.File.VroomItemID
-                } 
-            };
+            var graphFileInfoList = new System.Collections.Generic.List<Migration.Engine.Model.GraphFileInfo>();
             var graphFiles = driveItems.Select(d => new Migration.Engine.Model.GraphFileInfo { DriveId = uploaded.File.VroomDriveID, ItemId = d.Id });
             graphFileInfoList.AddRange(graphFiles);
 
             var batchAnalytics = await graphFileInfoList.GetDriveItemsAnalytics(gc, _tracer);
+            Assert.IsTrue(batchAnalytics.Count == graphFiles.Count());
 
-            // Unfortunately we won't get analytics for new items. Just check it works
-            Assert.IsTrue(analytics.IncompleteData!.ResultsPending);
+            var filesWithAnalytics = batchAnalytics.Select(d => d.Value).Where(v=> v.AccessStats != null && v.AccessStats.ActionCount > 0).ToList();
         }
 
         /// <summary>

@@ -12,22 +12,19 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
 {
     public static class GraphFileInfoListExtensions
     {
-        const int MAX_BATCH = 20;
+        const int MAX_BATCH = 5;
         public static async Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>> GetDriveItemsAnalytics(this List<GraphFileInfo> graphFiles, GraphServiceClient serviceClient, DebugTracer tracer)
         {
-            var fileResults = new Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>();
+            var allReqs = new Dictionary<IBaseRequest, GraphFileInfo>();
             foreach (var file in graphFiles)
             {
-                var req = new AllTimeAnalytics(file);
+                var req = new AllTimeAnalyticsRequest(file);
 
-                var result = await HttpClientExtensions.ExecuteHttpCallWithThrottleRetries(async () => await serviceClient.HttpProvider.SendAsync(req.GetHttpRequestMessage()), tracer);
-                var responseContent = await result.Content.ReadAsStringAsync();
-
-                result.EnsureSuccessStatusCode();
-
-                var analyticsData = JsonSerializer.Deserialize<ItemAnalyticsRepsonse>(responseContent) ?? new ItemAnalyticsRepsonse();
-                fileResults.Add(file, analyticsData);
+                allReqs.Add(req, file);
             }
+
+            // Get back results over X batches
+            var fileResults = await ProcessAllRequestsInParallel(allReqs, serviceClient, tracer);
 
             return fileResults;
         }
@@ -114,11 +111,11 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
 
 
 
-    public class AllTimeAnalytics : IBaseRequest
+    public class AllTimeAnalyticsRequest : IBaseRequest
     {
         private readonly GraphFileInfo _graphFileInfo;
 
-        public AllTimeAnalytics(GraphFileInfo graphFileInfo)
+        public AllTimeAnalyticsRequest(GraphFileInfo graphFileInfo)
         {
             this._graphFileInfo = graphFileInfo;
         }
