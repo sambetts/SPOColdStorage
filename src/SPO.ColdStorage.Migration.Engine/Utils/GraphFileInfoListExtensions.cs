@@ -1,9 +1,11 @@
 ﻿using Microsoft.Graph;
+using Microsoft.Identity.Client;
 using SPO.ColdStorage.Migration.Engine.Model;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -12,95 +14,51 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
 {
     public static class GraphFileInfoListExtensions
     {
-        const int MAX_BATCH = 2;
-        public static async Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>> GetDriveItemsAnalytics(this List<GraphFileInfo> graphFiles, GraphServiceClient serviceClient, DebugTracer tracer)
+
+        const int MAX_BATCH = 10;
+        public static async Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>> GetDriveItemsAnalytics(this List<GraphFileInfo> graphFiles, string baseSiteAddress, string token, DebugTracer tracer)
         {
             var allReqs = new Dictionary<IBaseRequest, GraphFileInfo>();
-            foreach (var file in graphFiles)
-            {
-                var req = new AllTimeAnalyticsRequest(file);
+            var httpClient = new HttpClient();
 
-                allReqs.Add(req, file);
-            }
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
 
             // Get back results over X batches
-            var fileResults = await ProcessAllRequestsInParallel(allReqs, serviceClient, tracer);
+            var fileResults = await ProcessAllRequestsInParallel(graphFiles, httpClient, baseSiteAddress, tracer);
 
             return fileResults;
         }
 
-        private static async Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>> ProcessAllRequestsInParallel(Dictionary<IBaseRequest, GraphFileInfo> reqsForFiles, GraphServiceClient serviceClient, DebugTracer tracer)
+
+        private static async Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>> ProcessAllRequestsInParallel(List<GraphFileInfo> reqsForFiles, HttpClient httpClient, string baseSiteAddress, DebugTracer tracer)
         {
             var fileSuccessResults = new ConcurrentDictionary<GraphFileInfo, ItemAnalyticsRepsonse>();
-            var pendingResults = new ConcurrentDictionary<IBaseRequest, GraphFileInfo>(reqsForFiles);
+            var pendingResults = new ConcurrentBag<GraphFileInfo>(reqsForFiles);
 
-            var batchList = new ParallelListProcessor<IBaseRequest>(MAX_BATCH, 1);      // Limit to just 1 thread for now to avoid heavy throttling
+            var batchList = new ParallelListProcessor<GraphFileInfo>(MAX_BATCH, 10);      // Limit to just 10 threads of MAX_BATCH for now to avoid heavy throttling
 
-            while (pendingResults.Count > 0)
+            await batchList.ProcessListInParallel(reqsForFiles, async (threadListChunk, threadIndex) =>
             {
-                int batchWaitValSeconds = 0;
-
-                await batchList.ProcessListInParallel(reqsForFiles.Keys, async (threadListChunk, threadIndex) =>
+                foreach (var req in threadListChunk)
                 {
+                    var url = $"{baseSiteAddress}/_api/v2.0/drives/{req.DriveId}/items/{req.ItemId}" +
+                        $"/analytics/allTime";
 
-                    // Build a batch request for this chunk. Get back request ID for each request
-                    var batchRequestContent = new BatchRequestContent();
-                    var fileResponsesBatchIdDic = new Dictionary<string, GraphFileInfo>();
-                    foreach (var req in threadListChunk)
+                    using (var r = await httpClient.GetAsyncWithThrottleRetries(url, tracer))
                     {
-                        fileResponsesBatchIdDic.Add(batchRequestContent.AddBatchRequestStep(req), reqsForFiles[req]);
+                        var body = await r.Content.ReadAsStringAsync();
+
+                        r.EnsureSuccessStatusCode();
+
+                        var activitiesResponse = JsonSerializer.Deserialize<ItemAnalyticsRepsonse>(body) ?? new ItemAnalyticsRepsonse();
+                        fileSuccessResults.AddOrUpdate(req, activitiesResponse, (index, oldVal) => activitiesResponse);
                     }
 
-                    // Read back responses
-                    var response = await serviceClient.Batch.Request().PostAsync(batchRequestContent);
-                    var batchResponses = await response.GetResponsesAsync();
-
-                    foreach (var responseId in fileResponsesBatchIdDic.Keys)
-                    {
-                        var itemResponse = batchResponses[responseId];
-                        var responseContent = await itemResponse.Content.ReadAsStringAsync();
-
-                        var fileInfo = fileResponsesBatchIdDic[responseId];
-                        var originalReq = reqsForFiles.Where(r => r.Value == fileInfo).FirstOrDefault().Key;
-
-                        // Success?
-                        if (itemResponse.IsSuccessStatusCode)
-                        {
-                            var analyticsData = JsonSerializer.Deserialize<ItemAnalyticsRepsonse>(responseContent) ?? new ItemAnalyticsRepsonse();
-                            fileSuccessResults.AddOrUpdate(fileResponsesBatchIdDic[responseId], analyticsData, (index, oldVal) => analyticsData);
-
-                            pendingResults.Remove(originalReq, out fileInfo);
-                        }
-                        else
-                        {
-                            if (itemResponse.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-                            {
-                                var responseWaitVal = itemResponse.GetRetryAfterHeaderSeconds();
-
-                                if (responseWaitVal.HasValue && responseWaitVal > batchWaitValSeconds) batchWaitValSeconds = responseWaitVal.Value;
-                            }
-                            else
-                            {
-                                // Blow up
-                                itemResponse.EnsureSuccessStatusCode();
-                            }
-                        }
-                    }
-                });
-
-                if (pendingResults.Count > 0)
-                {
-                    // Trace standard throttling message
-                    tracer.TrackTrace($"{Constants.THROTTLE_ERROR} executing Graph request. Sleeping for {batchWaitValSeconds} seconds (read from 'Retry-After' response from Graph).", Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Warning);
-
-                    // Delay for the requested seconds
-                    await Task.Delay(batchWaitValSeconds * 1000);
-                    tracer.TrackTrace($"Got another {pendingResults.Count} to retry...");
-
-                    // Reset in case next throttle is less
-                    batchWaitValSeconds = 0;
                 }
-            }
+            });
+
+
 
             return new Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>(fileSuccessResults);
         }

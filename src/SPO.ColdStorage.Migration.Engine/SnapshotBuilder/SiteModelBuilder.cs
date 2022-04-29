@@ -79,14 +79,16 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
         private async Task Crawler_SharePointFileFound(SharePointFileInfo arg)
         {
-            var newFile = new SiteFile() { FileName = arg.ServerRelativeFilePath };
+            SiteFile? newFile = null;
 
             if (arg is DriveItemSharePointFileInfo)
             {
                 var driveArg = (DriveItemSharePointFileInfo)arg;
 
-                // Add file to background processing queue
                 var graphInfo = new GraphFileInfo { DriveId = driveArg.DriveId, ItemId = driveArg.GraphItemId };
+                newFile = new DocumentSiteFile() { FileName = arg.ServerRelativeFilePath, GraphFileInfo = graphInfo };
+
+                // Add file to background processing queue
                 await _backgroundTaskLock.WaitAsync();
                 try
                 {
@@ -97,7 +99,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                         _pendingMetaFiles.Clear();
 
                         // Fire & forget
-                        _ = ProcessMetaChunk(files);
+                        await ProcessMetaChunk(files);
                     }
                 }
                 finally
@@ -107,11 +109,16 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             }
             else
             {
-                newFile.FileType = FileType.ListItemAttachement;
+                newFile = new SiteFile() { FileName = arg.ServerRelativeFilePath };
             }
 
             // Add file to site files list
             await _fileResultsUpdateTaskLock.WaitAsync();
+
+            if (_model.Files.Count % 100 == 0)
+            {
+                Console.WriteLine($"Processed {_model.Files.Count} files");
+            }
             try
             {
                 _model.Files.Add(newFile);
@@ -125,7 +132,12 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         private async Task ProcessMetaChunk(List<GraphFileInfo> files)
         {
             int updated = 0;
-            var stats = await files.GetDriveItemsAnalytics(_graphServiceClient, _tracer);
+            var creds = new ClientSecretCredential(_config.AzureAdConfig.TenantId, _config.AzureAdConfig.ClientID, _config.AzureAdConfig.Secret);
+
+            var app = await AuthUtils.GetNewClientApp(_config);
+            var auth = await app.AuthForSharePointOnline(_config.BaseServerAddress);
+            
+            var stats = await files.GetDriveItemsAnalytics(_site.RootURL, auth.AccessToken, _tracer);
             foreach (var stat in stats)
             {
                 if (stat.Value.AccessStats != null)
@@ -134,7 +146,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
                     try
                     {
-                        var file = _model.Files.Where(f => f.GraphFileInfo.ItemId == stat.Key.ItemId).FirstOrDefault();
+                        var file = _model.Documents.Where(f => f.GraphFileInfo.ItemId == stat.Key.ItemId).FirstOrDefault();
                         if (file != null)
                         {
                             file.AccessCount = stat.Value.AccessStats.ActionCount;

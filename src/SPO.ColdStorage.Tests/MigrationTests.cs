@@ -67,6 +67,7 @@ namespace SPO.ColdStorage.Tests
 
             var creds = new ClientSecretCredential(_config.AzureAdConfig.TenantId, _config.AzureAdConfig.ClientID, _config.AzureAdConfig.Secret);
             var gc = new GraphServiceClient(creds);
+            var auth = await app.AuthForSharePointOnline(_config.BaseServerAddress);
 
             // Test batch method with files in doc-lib
             var driveItems = await gc.Drives[uploaded.File.VroomDriveID].Root.Children.Request().GetAsync();
@@ -75,7 +76,7 @@ namespace SPO.ColdStorage.Tests
             var graphFiles = driveItems.Select(d => new Migration.Engine.Model.GraphFileInfo { DriveId = uploaded.File.VroomDriveID, ItemId = d.Id });
             graphFileInfoList.AddRange(graphFiles);
 
-            var batchAnalytics = await graphFileInfoList.GetDriveItemsAnalytics(gc, _tracer);
+            var batchAnalytics = await graphFileInfoList.GetDriveItemsAnalytics(_config!.DevConfig.DefaultSharePointSite, auth.AccessToken, _tracer);
             Assert.IsTrue(batchAnalytics.Count == graphFiles.Count());
 
             var filesWithAnalytics = batchAnalytics.Select(d => d.Value).Where(v=> v.AccessStats != null && v.AccessStats.ActionCount > 0).ToList();

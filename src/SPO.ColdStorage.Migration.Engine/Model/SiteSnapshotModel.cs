@@ -11,7 +11,6 @@ namespace SPO.ColdStorage.Migration.Engine.Model
 {
     public class Snapshot
     {
-
         public List<SiteSnapshotModel> SiteSnapshots { get; set; } = new List<SiteSnapshotModel>();
     }
     public class SiteSnapshotModel
@@ -22,22 +21,34 @@ namespace SPO.ColdStorage.Migration.Engine.Model
         public TargetMigrationSite Site { get; set; } = new TargetMigrationSite();
 
         public List<SiteFile> Files { get; set; } = new List<SiteFile>();
+
+        public List<DocumentSiteFile> Documents => Files.Where(f => f.GetType() == typeof(DocumentSiteFile)).Select(d=> new DocumentSiteFile(d)).ToList();
     }
     public class SiteFile
     {
+        public SiteFile() { }
+        public SiteFile(SiteFile d)
+        {
+            this.FileName = d.FileName;
+        }
+
         public string FileName { get; set; } = string.Empty;
-        public GraphFileInfo GraphFileInfo { get; set; } = new GraphFileInfo();
-
-        public int? AccessCount { get; set; }
-
-        public FileType FileType { get; set; }
     }
-
-    public enum FileType
+    public class DocumentSiteFile : SiteFile
     {
-        Unknown,
-        ListItemAttachement,
-        DocumentLibraryFile
+        public DocumentSiteFile() { }
+        public DocumentSiteFile(SiteFile d) :base(d)
+        {
+            if (d is DocumentSiteFile)
+            {
+                var graphFileInfo = (DocumentSiteFile)d;
+                GraphFileInfo = graphFileInfo.GraphFileInfo;
+                AccessCount = graphFileInfo.AccessCount;
+            }
+        }
+
+        public GraphFileInfo GraphFileInfo { get; set; } = new GraphFileInfo();
+        public int? AccessCount { get; set; }
     }
 
     public class GraphFileInfo
