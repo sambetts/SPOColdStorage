@@ -1,4 +1,5 @@
 ﻿
+using SPO.ColdStorage.Entities;
 using SPO.ColdStorage.Migration.Engine;
 using SPO.ColdStorage.Migration.Engine.SnapshotBuilder;
 using SPO.ColdStorage.Migration.Engine.Utils;
@@ -18,5 +19,16 @@ if (config.HaveAppInsightsConfigured)
 else
     tracer = DebugTracer.ConsoleOnlyTracer();
 
+
+// Init DB
+using (var db = new SPOColdStorageDbContext(config))
+{
+    await DbInitializer.Init(db, config.DevConfig);
+}
+
+
 var analyser = new TenantModelBuilder(config, tracer);
 await analyser.Build();
+
+
+Console.WriteLine("\nAll sites scanned. Finished building snapshot.");

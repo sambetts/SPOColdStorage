@@ -12,7 +12,7 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
 {
     public static class GraphFileInfoListExtensions
     {
-        const int MAX_BATCH = 5;
+        const int MAX_BATCH = 2;
         public static async Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>> GetDriveItemsAnalytics(this List<GraphFileInfo> graphFiles, GraphServiceClient serviceClient, DebugTracer tracer)
         {
             var allReqs = new Dictionary<IBaseRequest, GraphFileInfo>();
@@ -34,12 +34,10 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
             var fileSuccessResults = new ConcurrentDictionary<GraphFileInfo, ItemAnalyticsRepsonse>();
             var pendingResults = new ConcurrentDictionary<IBaseRequest, GraphFileInfo>(reqsForFiles);
 
-            var batchList = new ParallelListProcessor<IBaseRequest>(MAX_BATCH);
+            var batchList = new ParallelListProcessor<IBaseRequest>(MAX_BATCH, 1);      // Limit to just 1 thread for now to avoid heavy throttling
 
             while (pendingResults.Count > 0)
             {
-                Console.WriteLine($"Batching {pendingResults.Count} requests...");
-
                 int batchWaitValSeconds = 0;
 
                 await batchList.ProcessListInParallel(reqsForFiles.Keys, async (threadListChunk, threadIndex) =>
@@ -88,12 +86,12 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
                             }
                         }
                     }
-                }, count => Console.WriteLine($"Batch with {count} requests"));
+                });
 
                 if (pendingResults.Count > 0)
                 {
                     // Trace standard throttling message
-                    tracer.TrackTrace($"{Constants.THROTTLE_ERROR} executing Graph request. Sleeping for {batchWaitValSeconds} seconds.", Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Warning);
+                    tracer.TrackTrace($"{Constants.THROTTLE_ERROR} executing Graph request. Sleeping for {batchWaitValSeconds} seconds (read from 'Retry-After' response from Graph).", Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Warning);
 
                     // Delay for the requested seconds
                     await Task.Delay(batchWaitValSeconds * 1000);

@@ -13,14 +13,20 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
     public class ParallelListProcessor<T>
     {
         private readonly int _maxItemsPerChunk;
-
-        public ParallelListProcessor(int maxItemsPerChunk)
+        private readonly int? maxThreads;
+        private SemaphoreSlim? _maxTaskLock;
+        public ParallelListProcessor(int maxItemsPerChunk, int? maxThreads)
         {
             if (maxItemsPerChunk < 1)
             {
                 throw new ArgumentException(nameof(maxItemsPerChunk));
             }
             this._maxItemsPerChunk = maxItemsPerChunk;
+            this.maxThreads = maxThreads;
+            if (maxThreads.HasValue)
+            {
+                _maxTaskLock = new SemaphoreSlim(maxThreads.Value);
+            }
         }
 
         /// <summary>
@@ -47,7 +53,6 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
             {
                 throw new ArgumentNullException(nameof(processListChunkDelegate));
             }
-
 
             // Figure out how many threads we'll need
             int rem = 0;
@@ -78,8 +83,17 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
                 var threadListChunk = allItems.Skip(recordsInsertedAlready).Take(recordsToTake).ToList();
                 recordsInsertedAlready += recordsToTake;
 
-                // Load chunk via delegate
+                // Load chunk via delegate. Limit max threads if needed
+                if (_maxTaskLock != null)
+                {
+                    await _maxTaskLock.WaitAsync();
+                }
                 tasks.Add(processListChunkDelegate(threadListChunk, threadIndex));
+
+                if (_maxTaskLock != null)
+                {
+                    _maxTaskLock.Release();
+                }
             }
 
             // Block for all threads

@@ -171,7 +171,7 @@ namespace SPO.ColdStorage.Migration.Engine
             if (docListItem.FileSystemObjectType == FileSystemObjectType.File && docListItem.File.Exists)
             {
 
-                var foundFileInfo = GetSharePointFileInfo(docListItem, docListItem.File.ServerRelativeUrl, listServerRelativeUrl);
+                var foundFileInfo = GetSharePointFileInfo(docListItem, docListItem.File.ServerRelativeUrl, listServerRelativeUrl, true);
                 if (listFolderConfig.IncludeFolder(foundFileInfo))
                 {
                     if (_foundFileToMigrateCallback != null)
@@ -201,7 +201,7 @@ namespace SPO.ColdStorage.Migration.Engine
 
             foreach (var attachment in item.AttachmentFiles)
             {
-                var foundFileInfo = GetSharePointFileInfo(item, attachment.ServerRelativeUrl, listServerRelativeUrl);
+                var foundFileInfo = GetSharePointFileInfo(item, attachment.ServerRelativeUrl, listServerRelativeUrl, false);
                 if (listFolderConfig.IncludeFolder(foundFileInfo))
                 {
                     if (_foundFileToMigrateCallback != null)
@@ -245,7 +245,7 @@ namespace SPO.ColdStorage.Migration.Engine
             }
         }
 
-        SharePointFileInfo GetSharePointFileInfo(ListItem item, string url, string listServerRelativeUrl)
+        SharePointFileInfo GetSharePointFileInfo(ListItem item, string url, string listServerRelativeUrl, bool isGraphDriveItem)
         {
             var dir = "";
             if (item.FieldValues.ContainsKey("FileDirRef"))
@@ -271,7 +271,7 @@ namespace SPO.ColdStorage.Migration.Engine
                     var authorVal = (FieldUserValue)authorFieldObj;
 
                     // Doc or list-item?
-                    if (string.IsNullOrEmpty(item.File?.VroomDriveID) || string.IsNullOrEmpty(item.File?.VroomItemID))
+                    if (!isGraphDriveItem)
                     {
                         // No Graph IDs - probably a list item
                         return new SharePointFileInfo

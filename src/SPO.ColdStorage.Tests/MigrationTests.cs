@@ -61,16 +61,9 @@ namespace SPO.ColdStorage.Tests
             // Update contents
             await targetList.SaveFile(ctx, fileTitle, System.Text.Encoding.UTF8.GetBytes(FILE_CONTENTS + "v2"));
 
-            var c = new CSOMv2Helper(app, _config!.BaseServerAddress, _config!.DevConfig.DefaultSharePointSite, _tracer);
             var uploaded = targetList.GetItemByUniqueId(newItemId);
 
             await uploaded.FullLoadListItemDoc(ctx);
-
-
-            var analytics = await c.GetDriveItemAnalytics(uploaded.File.VroomDriveID, uploaded.File.VroomItemID);
-
-            // Unfortunately we won't get analytics for new items. Just check it works
-            Assert.IsTrue(analytics.IncompleteData!.ResultsPending);
 
             var creds = new ClientSecretCredential(_config.AzureAdConfig.TenantId, _config.AzureAdConfig.ClientID, _config.AzureAdConfig.Secret);
             var gc = new GraphServiceClient(creds);

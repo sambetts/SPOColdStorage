@@ -1,4 +1,6 @@
-﻿using Microsoft.Identity.Client;
+﻿using Azure.Identity;
+using Microsoft.Graph;
+using Microsoft.Identity.Client;
 using SPO.ColdStorage.Entities;
 using SPO.ColdStorage.Entities.Configuration;
 using SPO.ColdStorage.Entities.DBEntities;
@@ -15,21 +17,23 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
     {
         #region Privates & Constructors
 
-        private readonly TargetMigrationSite site;
+        private readonly TargetMigrationSite _site;
         private readonly SPOColdStorageDbContext _db;
         private readonly SiteListFilterConfig _siteFilterConfig;
         private readonly SiteSnapshotModel _model;
-        private readonly CSOMv2Helper _CSOMv2Helper;
+        private readonly GraphServiceClient _graphServiceClient;
         const int MAX_BATCH_PETITIONS = 20;
 
         private List<GraphFileInfo> _pendingMetaFiles = new();
         private SemaphoreSlim _backgroundTaskLock = new(1, 1);
-        public SiteModelBuilder(IConfidentialClientApplication app, Config config, DebugTracer debugTracer, TargetMigrationSite site) : base(config, debugTracer)
+        private SemaphoreSlim _fileResultsUpdateTaskLock = new(1, 1);
+        public SiteModelBuilder(ClientSecretCredential app, Config config, DebugTracer debugTracer, TargetMigrationSite site) : base(config, debugTracer)
         {
-            this.site = site;
+            this._site = site;
             _db = new SPOColdStorageDbContext(this._config);
             _model = new SiteSnapshotModel();
-            _CSOMv2Helper = new CSOMv2Helper(app, config.BaseServerAddress, site.RootURL, _tracer);
+
+            _graphServiceClient = new GraphServiceClient(app);
 
             // Figure out what to analyse
             SiteListFilterConfig? siteFilterConfig = null;
@@ -64,7 +68,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         {
             if (!_model.Finished.HasValue)
             {
-                var ctx = await AuthUtils.GetClientContext(_config, site.RootURL, _tracer);
+                var ctx = await AuthUtils.GetClientContext(_config, _site.RootURL, _tracer);
                 var crawler = new SiteListsAndLibrariesCrawler(ctx, _tracer, Crawler_SharePointFileFound);
                 await crawler.CrawlContextRootWebAndSubwebs(_siteFilterConfig);
             }
@@ -81,6 +85,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             {
                 var driveArg = (DriveItemSharePointFileInfo)arg;
 
+                // Add file to background processing queue
                 var graphInfo = new GraphFileInfo { DriveId = driveArg.DriveId, ItemId = driveArg.GraphItemId };
                 await _backgroundTaskLock.WaitAsync();
                 try
@@ -90,24 +95,14 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                     {
                         var files = new List<GraphFileInfo>(_pendingMetaFiles);
                         _pendingMetaFiles.Clear();
-                        await ProcessMetaChunk(files);
+
+                        // Fire & forget
+                        _ = ProcessMetaChunk(files);
                     }
                 }
                 finally
                 {
                     _backgroundTaskLock.Release();
-                }
-
-                var stats = await _CSOMv2Helper.GetDriveItemAnalytics(driveArg.DriveId, driveArg.GraphItemId);
-
-                newFile.FileType = FileType.DocumentLibraryFile;
-                if (stats.AccessStats != null)
-                {
-                    newFile.AccessCount = stats.AccessStats.ActionCount;
-                }
-                else
-                {
-                    newFile.AccessCount = null;
                 }
             }
             else
@@ -115,15 +110,45 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 newFile.FileType = FileType.ListItemAttachement;
             }
 
-            _model.Files.Add(newFile);
-            Console.WriteLine($"lol {arg.FullSharePointUrl}");
+            // Add file to site files list
+            await _fileResultsUpdateTaskLock.WaitAsync();
+            try
+            {
+                _model.Files.Add(newFile);
+            }
+            finally
+            {
+                _fileResultsUpdateTaskLock.Release();
+            }
         }
 
-        private Task ProcessMetaChunk(List<GraphFileInfo> files)
+        private async Task ProcessMetaChunk(List<GraphFileInfo> files)
         {
-            throw new NotImplementedException();
+            int updated = 0;
+            var stats = await files.GetDriveItemsAnalytics(_graphServiceClient, _tracer);
+            foreach (var stat in stats)
+            {
+                if (stat.Value.AccessStats != null)
+                {
+                    await _fileResultsUpdateTaskLock.WaitAsync();
+
+                    try
+                    {
+                        var file = _model.Files.Where(f => f.GraphFileInfo.ItemId == stat.Key.ItemId).FirstOrDefault();
+                        if (file != null)
+                        {
+                            file.AccessCount = stat.Value.AccessStats.ActionCount;
+                            updated++;
+                        }
+                    }
+                    finally
+                    {
+                        _fileResultsUpdateTaskLock.Release();
+                    }
+                }
+            }
+
+            _tracer.TrackTrace($"Updated {updated} stats for {files.Count} files.");
         }
     }
-
-
 }
