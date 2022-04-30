@@ -11,11 +11,14 @@ namespace SPO.ColdStorage.Models
         public DateTime Started { get; set; } = DateTime.Now;
         public DateTime? Finished { get; set; }
 
-        //public TargetMigrationSite Site { get; set; } = new TargetMigrationSite();
-
         public List<SiteList> Lists { get; set; } = new List<SiteList> { };
         public List<DocLib> DocLibs => Lists.Where(f => f.GetType() == typeof(DocLib)).Select(d => new DocLib(d)).ToList();
         public List<SiteFile> AllFiles => Lists.SelectMany(l => l.Files).ToList();
+
+        public List<DocumentSiteFile> DocsPendingAnalysis => AllFiles
+            .Where(f=> f is DocumentSiteFile && ((DocumentSiteFile)f).State == SiteFileAnalysisState.AnalysisPending)
+            .Select(f => new DocumentSiteFile(f)).ToList();
+
 
         public void UpdateDocItem(GraphFileInfo key, ItemAnalyticsRepsonse.AnalyticsItemActionStat accessStats)
         {
@@ -79,16 +82,26 @@ namespace SPO.ColdStorage.Models
 
     public class SiteFile
     {
-        public SiteFile() { }
-        public SiteFile(SiteFile d)
+        public SiteFile() 
+        {
+        }
+        public SiteFile(SiteFile d) : this()
         {
             this.FileName = d.FileName;
         }
 
         public string FileName { get; set; } = string.Empty;
     }
+    public enum SiteFileAnalysisState
+    {
+        Unknown,
+        AnalysisPending,
+        Complete
+    }
+
     public class DocumentSiteFile : SiteFile
     {
+        public SiteFileAnalysisState State { get; set; } = SiteFileAnalysisState.Unknown;
         public DocumentSiteFile() { }
         public DocumentSiteFile(SiteFile d) : base(d)
         {

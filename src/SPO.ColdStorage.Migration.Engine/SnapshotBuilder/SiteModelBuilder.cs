@@ -73,16 +73,38 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 await crawler.CrawlContextRootWebAndSubwebs(_siteFilterConfig);
             }
 
-            Console.WriteLine("Waiting for background tasks...");
-            await Task.WhenAll(_backgroundMetaTasks);
-
-            foreach (var backgroundTask in _backgroundMetaTasks)
+            var filesToGetAnalysisFor = true;
+            while (filesToGetAnalysisFor)
             {
-                foreach (var stat in backgroundTask.Result)
+                var outstandingFiles = _model.DocsPendingAnalysis;
+                filesToGetAnalysisFor = outstandingFiles.Any();
+
+                _tracer.TrackTrace($"Analysing {outstandingFiles.Count.ToString("N0")} files for last-usage...");
+
+
+                foreach (var file in outstandingFiles)
+                    _pendingMetaFiles.Add(file.GraphFileInfo);
+
+                if (_pendingMetaFiles.Count >= MAX_BATCH_PETITIONS)
                 {
-                    if (stat.Value.AccessStats != null)
+                    var files = new List<GraphFileInfo>(_pendingMetaFiles);
+                    _pendingMetaFiles.Clear();
+
+                    // Fire & forget
+                    _backgroundMetaTasks.Add(ProcessMetaChunk(files));
+                }
+
+                Console.WriteLine("Waiting for background tasks...");
+                await Task.WhenAll(_backgroundMetaTasks);
+
+                foreach (var backgroundTask in _backgroundMetaTasks)
+                {
+                    foreach (var stat in backgroundTask.Result)
                     {
-                        _model.UpdateDocItem(stat.Key, stat.Value.AccessStats);
+                        if (stat.Value.AccessStats != null)
+                        {
+                            _model.UpdateDocItem(stat.Key, stat.Value.AccessStats);
+                        }
                     }
                 }
             }
@@ -97,26 +119,19 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         {
             SiteFile? newFile = null;
 
-
             if (arg is DriveItemSharePointFileInfo)
             {
                 var driveArg = (DriveItemSharePointFileInfo)arg;
 
                 var graphInfo = new GraphFileInfo { DriveId = driveArg.DriveId, ItemId = driveArg.GraphItemId };
-                newFile = new DocumentSiteFile() { FileName = arg.ServerRelativeFilePath, GraphFileInfo = graphInfo };
 
-                _pendingMetaFiles.Add(graphInfo);
-                if (_pendingMetaFiles.Count >= MAX_BATCH_PETITIONS)
-                {
-                    var files = new List<GraphFileInfo>(_pendingMetaFiles);
-                    _pendingMetaFiles.Clear();
+                // Pending analysis data
+                newFile = new DocumentSiteFile() { FileName = arg.ServerRelativeFilePath, GraphFileInfo = graphInfo, State = SiteFileAnalysisState.AnalysisPending };
 
-                    // Fire & forget
-                    _backgroundMetaTasks.Add(ProcessMetaChunk(files));
-                }
             }
             else
             {
+                // Nothing to analyse for list item attachments
                 newFile = new SiteFile() { FileName = arg.ServerRelativeFilePath };
             }
 
@@ -125,7 +140,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
             if (_model.AllFiles.Count % 100 == 0)
             {
-                Console.WriteLine($"Processed {_model.AllFiles.Count} files");
+                Console.WriteLine($"Processed {_model.AllFiles.Count.ToString("N0")} files");
             }
             try
             {
