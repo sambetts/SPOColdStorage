@@ -12,11 +12,11 @@ namespace SPO.ColdStorage.Migration.Engine.Migration
     public class SharePointFileDownloader : BaseComponent
     {
         private readonly IConfidentialClientApplication _app;
-        private readonly HttpClient _client;
+        private readonly ThrottledHttpClient _client;
         public SharePointFileDownloader(IConfidentialClientApplication app, Config config, DebugTracer debugTracer) : base(config, debugTracer)
         {
             _app = app;
-            _client = new HttpClient();
+            _client = new ThrottledHttpClient();
 
 
             var productValue = new ProductInfoHeaderValue("SPOColdStorageMigration", "1.0");

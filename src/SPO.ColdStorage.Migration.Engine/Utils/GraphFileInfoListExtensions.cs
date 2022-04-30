@@ -10,12 +10,9 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
     {
 
         const int MAX_BATCH = 10;
-        public static async Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>> GetDriveItemsAnalytics(this List<GraphFileInfo> graphFiles, string baseSiteAddress, string token, DebugTracer tracer)
+        public static async Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>> GetDriveItemsAnalytics(this List<GraphFileInfo> graphFiles, string baseSiteAddress, ThrottledHttpClient httpClient, DebugTracer tracer)
         {
             var allReqs = new Dictionary<IBaseRequest, GraphFileInfo>();
-            var httpClient = new HttpClient();
-
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
 
             // Get back results over X batches
@@ -25,7 +22,7 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
         }
 
 
-        private static async Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>> ProcessAllRequestsInParallel(List<GraphFileInfo> reqsForFiles, HttpClient httpClient, string baseSiteAddress, DebugTracer tracer)
+        private static async Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>> ProcessAllRequestsInParallel(List<GraphFileInfo> reqsForFiles, ThrottledHttpClient httpClient, string baseSiteAddress, DebugTracer tracer)
         {
             var fileSuccessResults = new ConcurrentDictionary<GraphFileInfo, ItemAnalyticsRepsonse>();
             var pendingResults = new ConcurrentBag<GraphFileInfo>(reqsForFiles);

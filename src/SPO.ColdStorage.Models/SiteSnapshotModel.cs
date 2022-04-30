@@ -12,12 +12,11 @@ namespace SPO.ColdStorage.Models
         public DateTime? Finished { get; set; }
 
         public List<SiteList> Lists { get; set; } = new List<SiteList> { };
-        public List<DocLib> DocLibs => Lists.Where(f => f.GetType() == typeof(DocLib)).Select(d => new DocLib(d)).ToList();
+        public List<DocLib> DocLibs => Lists.Where(f => f.GetType() == typeof(DocLib)).Cast<DocLib>().ToList();
         public List<SiteFile> AllFiles => Lists.SelectMany(l => l.Files).ToList();
 
         public List<DocumentSiteFile> DocsPendingAnalysis => AllFiles
-            .Where(f=> f is DocumentSiteFile && ((DocumentSiteFile)f).State == SiteFileAnalysisState.AnalysisPending)
-            .Select(f => new DocumentSiteFile(f)).ToList();
+            .Where(f=> f is DocumentSiteFile && ((DocumentSiteFile)f).State == SiteFileAnalysisState.AnalysisPending).Cast<DocumentSiteFile>().ToList();
 
 
         public void UpdateDocItem(GraphFileInfo key, ItemAnalyticsRepsonse.AnalyticsItemActionStat accessStats)
@@ -29,6 +28,7 @@ namespace SPO.ColdStorage.Models
             if (file != null)
             {
                 file.AccessCount = accessStats.ActionCount;
+                file.State = SiteFileAnalysisState.Complete;
             }
             else
             {
@@ -38,20 +38,29 @@ namespace SPO.ColdStorage.Models
 
         public void AddFile(SiteFile newFile, SiteList list)
         {
-
-            var targetList = Lists.Where(l => l == list).SingleOrDefault();
-            if (targetList == null)
+            lock (this)
             {
-                targetList = list;
-                Lists.Add(targetList);
-            }
+                var targetList = Lists.Where(l => l.Equals(list)).SingleOrDefault();
+                if (targetList == null)
+                {
+                    targetList = list;
+                    Lists.Add(targetList);
+                }
 
-            targetList.Files.Add(newFile); 
+                targetList.Files.Add(newFile);
+            }
         }
     }
 
     public class SiteList : IEquatable<SiteList>
     {
+        public SiteList() { }
+        public SiteList(SiteList l)
+        {
+            this.Title = l.Title;
+            this.ServerRelativeUrl = l.ServerRelativeUrl;
+        }
+
         public string Title { get; set; } = string.Empty;
         public string ServerRelativeUrl { get; set; } = string.Empty;
         public List<SiteFile> Files { get; set; } = new List<SiteFile>();
@@ -66,17 +75,19 @@ namespace SPO.ColdStorage.Models
     public class DocLib : SiteList
     {
         public DocLib() { }
-        public DocLib(SiteList d)
+        public DocLib(SiteList l) :base(l)
         {
-            if (d is DocLib)
+            if (l is DocLib)
             {
-                var lib = (DocLib)d;
+                var lib = (DocLib)l;
+                this.DriveId = lib.DriveId;
                 this.Delta = lib.Delta;
+                this.Files = lib.Files;
             }
         }
         public string DriveId { get; set; } = string.Empty;
 
-        public List<DocumentSiteFile> Documents => Files.Where(f => f.GetType() == typeof(DocumentSiteFile)).Select(d => new DocumentSiteFile(d)).ToList();
+        public List<DocumentSiteFile> Documents => Files.Where(f => f.GetType() == typeof(DocumentSiteFile)).Cast<DocumentSiteFile>().ToList();
         public string Delta { get; set; } = string.Empty;
     }
 
@@ -96,6 +107,7 @@ namespace SPO.ColdStorage.Models
     {
         Unknown,
         AnalysisPending,
+        AnalysisInProgress,
         Complete
     }
 
@@ -110,6 +122,7 @@ namespace SPO.ColdStorage.Models
                 var graphFileInfo = (DocumentSiteFile)d;
                 GraphFileInfo = graphFileInfo.GraphFileInfo;
                 AccessCount = graphFileInfo.AccessCount;
+                State = graphFileInfo.State;
             }
         }
 

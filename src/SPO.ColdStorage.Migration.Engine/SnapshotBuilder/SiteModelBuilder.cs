@@ -1,11 +1,11 @@
 ﻿using Azure.Identity;
-using Microsoft.Graph;
 using SPO.ColdStorage.Entities;
 using SPO.ColdStorage.Entities.Configuration;
 using SPO.ColdStorage.Entities.DBEntities;
 using SPO.ColdStorage.Migration.Engine.Utils;
 using SPO.ColdStorage.Models;
 using System.Collections.Concurrent;
+using System.Net.Http.Headers;
 
 namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 {
@@ -20,11 +20,9 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         private readonly SPOColdStorageDbContext _db;
         private readonly SiteListFilterConfig _siteFilterConfig;
         private readonly SiteSnapshotModel _model;
-        private readonly GraphServiceClient _graphServiceClient;
         const int MAX_BATCH_PETITIONS = 20;
 
         private ConcurrentBag<GraphFileInfo> _pendingMetaFiles = new();
-        private SemaphoreSlim _backgroundTaskLock = new(1, 1);
         private SemaphoreSlim _fileResultsUpdateTaskLock = new(1, 1);
         private List<Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>>> _backgroundMetaTasks = new();
         public SiteModelBuilder(ClientSecretCredential app, Config config, DebugTracer debugTracer, TargetMigrationSite site) : base(config, debugTracer)
@@ -32,8 +30,6 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             this._site = site;
             _db = new SPOColdStorageDbContext(this._config);
             _model = new SiteSnapshotModel();
-
-            _graphServiceClient = new GraphServiceClient(app);
 
             // Figure out what to analyse
             SiteListFilterConfig? siteFilterConfig = null;
@@ -71,45 +67,63 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 var ctx = await AuthUtils.GetClientContext(_config, _site.RootURL, _tracer);
                 var crawler = new SiteListsAndLibrariesCrawler(ctx, _tracer, Crawler_SharePointFileFound);
                 await crawler.CrawlContextRootWebAndSubwebs(_siteFilterConfig);
-            }
 
-            var filesToGetAnalysisFor = true;
-            while (filesToGetAnalysisFor)
-            {
-                var outstandingFiles = _model.DocsPendingAnalysis;
-                filesToGetAnalysisFor = outstandingFiles.Any();
+                _model.Started = DateTime.Now;
 
-                _tracer.TrackTrace($"Analysing {outstandingFiles.Count.ToString("N0")} files for last-usage...");
+                // Get auth for REST
+                var app = await AuthUtils.GetNewClientApp(_config);
+                var auth = await app.AuthForSharePointOnline(_config.BaseServerAddress);
+                var httpClient = new ThrottledHttpClient();
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
 
-
-                foreach (var file in outstandingFiles)
-                    _pendingMetaFiles.Add(file.GraphFileInfo);
-
-                if (_pendingMetaFiles.Count >= MAX_BATCH_PETITIONS)
+                var filesToGetAnalysisFor = true;
+                while (filesToGetAnalysisFor)
                 {
-                    var files = new List<GraphFileInfo>(_pendingMetaFiles);
-                    _pendingMetaFiles.Clear();
+                    var outstandingFiles = _model.DocsPendingAnalysis;
+                    filesToGetAnalysisFor = outstandingFiles.Any();
 
-                    // Fire & forget
-                    _backgroundMetaTasks.Add(ProcessMetaChunk(files));
-                }
+                    _tracer.TrackTrace($"START: Analysing {outstandingFiles.Count.ToString("N0")} files for last-usage...");
 
-                Console.WriteLine("Waiting for background tasks...");
-                await Task.WhenAll(_backgroundMetaTasks);
-
-                foreach (var backgroundTask in _backgroundMetaTasks)
-                {
-                    foreach (var stat in backgroundTask.Result)
+                    foreach (var file in outstandingFiles)
                     {
-                        if (stat.Value.AccessStats != null)
+                        // Avoid analysing more than once
+                        file.State = SiteFileAnalysisState.AnalysisInProgress;
+
+                        _pendingMetaFiles.Add(file.GraphFileInfo);
+                        if (_pendingMetaFiles.Count >= MAX_BATCH_PETITIONS)
                         {
-                            _model.UpdateDocItem(stat.Key, stat.Value.AccessStats);
+                            var files = new List<GraphFileInfo>(_pendingMetaFiles);
+                            _pendingMetaFiles.Clear();
+
+                            // Fire & forget
+                            _backgroundMetaTasks.Add(ProcessMetaChunk(files, httpClient));
                         }
                     }
+
+                    Console.WriteLine("Waiting for background tasks...");
+                    await Task.WhenAll(_backgroundMetaTasks);
+
+                    // Update with results
+                    foreach (var backgroundTask in _backgroundMetaTasks)
+                    {
+                        foreach (var stat in backgroundTask.Result)
+                        {
+                            if (stat.Value.AccessStats != null)
+                            {
+                                _model.UpdateDocItem(stat.Key, stat.Value.AccessStats);
+                            }
+                        }
+                    }
+
+                    // Check again if anything to do
+                    filesToGetAnalysisFor = outstandingFiles.Any();
                 }
+
+                _model.Finished = DateTime.Now;
+                var ts = _model.Finished.Value.Subtract(_model.Started);
+                Console.WriteLine($"Finished site - done in {ts.TotalMinutes.ToString("N2")} mins");
             }
 
-            Console.WriteLine("Finished site");
 
             return _model;
         }
@@ -152,12 +166,9 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             }
         }
 
-        private async Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>> ProcessMetaChunk(List<GraphFileInfo> files)
+        private async Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>> ProcessMetaChunk(List<GraphFileInfo> files, ThrottledHttpClient httpClient)
         {
-            var app = await AuthUtils.GetNewClientApp(_config);
-            var auth = await app.AuthForSharePointOnline(_config.BaseServerAddress);
-
-            var stats = await files.GetDriveItemsAnalytics(_site.RootURL, auth.AccessToken, _tracer);
+            var stats = await files.GetDriveItemsAnalytics(_site.RootURL, httpClient, _tracer);
 
             _tracer.TrackTrace($"Updated stats for {files.Count} files.");
             return stats;

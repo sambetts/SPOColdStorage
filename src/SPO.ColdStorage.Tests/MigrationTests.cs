@@ -69,14 +69,18 @@ namespace SPO.ColdStorage.Tests
             var gc = new GraphServiceClient(creds);
             var auth = await app.AuthForSharePointOnline(_config.BaseServerAddress);
 
+
+            var httpClient = new ThrottledHttpClient();
+            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", auth.AccessToken);
+
             // Test batch method with files in doc-lib
             var driveItems = await gc.Drives[uploaded.File.VroomDriveID].Root.Children.Request().GetAsync();
 
-            var graphFileInfoList = new System.Collections.Generic.List<Migration.Engine.Model.GraphFileInfo>();
-            var graphFiles = driveItems.Select(d => new Migration.Engine.Model.GraphFileInfo { DriveId = uploaded.File.VroomDriveID, ItemId = d.Id });
+            var graphFileInfoList = new System.Collections.Generic.List<GraphFileInfo>();
+            var graphFiles = driveItems.Select(d => new GraphFileInfo { DriveId = uploaded.File.VroomDriveID, ItemId = d.Id });
             graphFileInfoList.AddRange(graphFiles);
 
-            var batchAnalytics = await graphFileInfoList.GetDriveItemsAnalytics(_config!.DevConfig.DefaultSharePointSite, auth.AccessToken, _tracer);
+            var batchAnalytics = await graphFileInfoList.GetDriveItemsAnalytics(_config!.DevConfig.DefaultSharePointSite, httpClient, _tracer);
             Assert.IsTrue(batchAnalytics.Count == graphFiles.Count());
 
             var filesWithAnalytics = batchAnalytics.Select(d => d.Value).Where(v=> v.AccessStats != null && v.AccessStats.ActionCount > 0).ToList();

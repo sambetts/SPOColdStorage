@@ -117,7 +117,13 @@ namespace SPO.ColdStorage.Migration.Engine
                                         item => item.File.VroomDriveID
                                     )
                                 );
-                    listModel = new DocLib() { Title = list.Title, ServerRelativeUrl = list.RootFolder.ServerRelativeUrl };
+
+                    // Set drive ID when 1st results come back
+                    listModel = new DocLib() 
+                    { 
+                        Title = list.Title, 
+                        ServerRelativeUrl = list.RootFolder.ServerRelativeUrl
+                    };
                 }
                 else
                 {
@@ -155,6 +161,13 @@ namespace SPO.ColdStorage.Migration.Engine
                     }
                     else if (list.BaseType == BaseType.DocumentLibrary)
                     {
+                        // We might be able get the drive Id from the actual list, but not sure how...get it from 1st item instead
+                        var docLib = (DocLib)listModel;
+                        if (string.IsNullOrEmpty(docLib.DriveId))
+                        {
+                            ((DocLib)listModel).DriveId = item.File.VroomDriveID;
+                        }
+
                         foundFileInfo = await ProcessDocLibItem(item, listModel, listFolderConfig);
                     }
                     if (foundFileInfo != null)
@@ -286,7 +299,8 @@ namespace SPO.ColdStorage.Migration.Engine
                             LastModified = dt,
                             WebUrl = _spClient.Web.Url,
                             SiteUrl = _spClient.Site.Url,
-                            Subfolder = dir.TrimEnd("/".ToCharArray())
+                            Subfolder = dir.TrimEnd("/".ToCharArray()),
+                            List = listModel
                         };
                     }
                     else
@@ -301,6 +315,7 @@ namespace SPO.ColdStorage.Migration.Engine
                             Subfolder = dir.TrimEnd("/".ToCharArray()),
                             GraphItemId = item.File.VroomItemID,
                             DriveId = item.File.VroomDriveID,
+                            List = listModel
                         };
                     }
                 }
