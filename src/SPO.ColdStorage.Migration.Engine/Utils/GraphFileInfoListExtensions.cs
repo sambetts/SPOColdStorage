@@ -1,14 +1,8 @@
 ﻿using Microsoft.Graph;
-using Microsoft.Identity.Client;
 using SPO.ColdStorage.Migration.Engine.Model;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace SPO.ColdStorage.Migration.Engine.Utils
 {
@@ -45,56 +39,29 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
                     var url = $"{baseSiteAddress}/_api/v2.0/drives/{req.DriveId}/items/{req.ItemId}" +
                         $"/analytics/allTime";
 
-                    using (var r = await httpClient.GetAsyncWithThrottleRetries(url, tracer))
+                    try
                     {
-                        var body = await r.Content.ReadAsStringAsync();
+                        using (var r = await httpClient.GetAsyncWithThrottleRetries(url, tracer))
+                        {
+                            var body = await r.Content.ReadAsStringAsync();
 
-                        r.EnsureSuccessStatusCode();
+                            r.EnsureSuccessStatusCode();
 
-                        var activitiesResponse = JsonSerializer.Deserialize<ItemAnalyticsRepsonse>(body) ?? new ItemAnalyticsRepsonse();
-                        fileSuccessResults.AddOrUpdate(req, activitiesResponse, (index, oldVal) => activitiesResponse);
+                            var activitiesResponse = JsonSerializer.Deserialize<ItemAnalyticsRepsonse>(body) ?? new ItemAnalyticsRepsonse();
+                            fileSuccessResults.AddOrUpdate(req, activitiesResponse, (index, oldVal) => activitiesResponse);
+                        }
                     }
-
+                    catch (HttpRequestException ex)
+                    {
+                        tracer.TrackException(ex);
+                        tracer.TrackTrace($"Got exception {ex.Message} getting analytics data for drive item {req.ItemId}", Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Error);
+                    }
                 }
             });
-
-
 
             return new Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>(fileSuccessResults);
         }
 
     }
 
-
-
-    public class AllTimeAnalyticsRequest : IBaseRequest
-    {
-        private readonly GraphFileInfo _graphFileInfo;
-
-        public AllTimeAnalyticsRequest(GraphFileInfo graphFileInfo)
-        {
-            this._graphFileInfo = graphFileInfo;
-        }
-
-        public string ContentType { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-
-        public IList<HeaderOption> Headers => throw new NotImplementedException();
-
-        public IBaseClient Client => throw new NotImplementedException();
-
-        public HttpMethods Method { get => HttpMethods.GET; set => throw new NotImplementedException(); }
-
-        public string RequestUrl => $"https://graph.microsoft.com/v1.0/drives/{_graphFileInfo.DriveId}/items/{_graphFileInfo.ItemId}/analytics/allTime";
-
-        public IList<QueryOption> QueryOptions => new List<QueryOption>();
-
-        public IDictionary<string, IMiddlewareOption> MiddlewareOptions => throw new NotImplementedException();
-
-        public IResponseHandler ResponseHandler => throw new NotImplementedException();
-
-        public HttpRequestMessage GetHttpRequestMessage()
-        {
-            return new HttpRequestMessage(HttpMethod.Get, RequestUrl);
-        }
-    }
 }

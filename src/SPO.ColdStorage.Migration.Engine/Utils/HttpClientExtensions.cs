@@ -27,7 +27,7 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
                 throw new ArgumentNullException(nameof(debugTracer));
             }
 
-            var response = await ExecuteHttpCallWithThrottleRetries(async () => await httpClient.GetAsync(url, completionOption), debugTracer);
+            var response = await ExecuteHttpCallWithThrottleRetries(async () => await httpClient.GetAsync(url, completionOption), url, debugTracer);
 
 
             return response!;
@@ -53,7 +53,7 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
             var payload = JsonSerializer.Serialize(body);
             var httpContent = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
 
-            var response = await ExecuteHttpCallWithThrottleRetries(async () => await httpClient.PostAsync(url, httpContent), debugTracer);
+            var response = await ExecuteHttpCallWithThrottleRetries(async () => await httpClient.PostAsync(url, httpContent), url, debugTracer);
 
             return response;
         }
@@ -81,12 +81,12 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
             header.Parameters.Add(new NameValueHeaderValue("boundary", boundary));
             body.Headers.ContentType = header;
 
-            var response = await ExecuteHttpCallWithThrottleRetries(async () => await httpClient.PostAsync(url, body), debugTracer);
+            var response = await ExecuteHttpCallWithThrottleRetries(async () => await httpClient.PostAsync(url, body), url, debugTracer);
 
             return response;
         }
 
-        public static async Task<HttpResponseMessage> ExecuteHttpCallWithThrottleRetries(Func<Task<HttpResponseMessage>> httpAction, DebugTracer debugTracer)
+        public static async Task<HttpResponseMessage> ExecuteHttpCallWithThrottleRetries(Func<Task<HttpResponseMessage>> httpAction, string url, DebugTracer debugTracer)
         {
             HttpResponseMessage? response = null;
             int retries = 0, secondsToWait = 0;
@@ -98,12 +98,14 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
 
                 if (!response.IsSuccessStatusCode && response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 {
+                    retries++;
+
                     // Do we have a "retry-after" header?
                     var waitValue = response.GetRetryAfterHeaderSeconds();
                     if (waitValue.HasValue)
                     {
                         secondsToWait = waitValue.Value;
-                        debugTracer.TrackTrace($"{Constants.THROTTLE_ERROR} downloading from REST. Waiting {secondsToWait} seconds to try again (from 'retry-after' header)...",
+                        debugTracer.TrackTrace($"{Constants.THROTTLE_ERROR} for {url}. Waiting {secondsToWait} seconds to for retry #{retries} (from 'retry-after' header)...",
                             Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Warning);
                     }
                     else
@@ -112,7 +114,7 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
                         if (retries == Constants.MAX_SPO_API_RETRIES)
                         {
                             // Don't try forever
-                            debugTracer.TrackTrace($"{Constants.THROTTLE_ERROR} downloading response from REST. Maximum retry attempts {Constants.MAX_SPO_API_RETRIES} has been attempted.",
+                            debugTracer.TrackTrace($"{Constants.THROTTLE_ERROR}. Maximum retry attempts {Constants.MAX_SPO_API_RETRIES} has been attempted for {url}.",
                                 Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Error);
 
                             // Allow normal HTTP exception & abort download
@@ -120,18 +122,21 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
                         }
 
                         // We've not reached throttling max retries...keep retrying
-                        retries++;
                         debugTracer.TrackTrace($"{Constants.THROTTLE_ERROR} downloading from REST. Waiting {retries} seconds to try again...",
                             Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Warning);
 
                         secondsToWait = retries;
                     }
 
+                    // Wait before trying again
                     await Task.Delay(1000 * secondsToWait);
                 }
+                else
+                {
+                    // Not HTTP 429. Don't bother retrying & let caller handle any error
+                    retryDownload = false;
+                }
 
-                // Sucess
-                retryDownload = false;
             }
 
             return response!;
