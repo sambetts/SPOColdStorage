@@ -26,4 +26,8 @@
     <ProjectReference Include="..\SPO.ColdStorage.Models\SPO.ColdStorage.Models.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Model\" />
+  </ItemGroup>
+
 </Project>

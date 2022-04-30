@@ -3,13 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SPO.ColdStorage.Entities;
 using SPO.ColdStorage.Entities.Configuration;
 using SPO.ColdStorage.Entities.DBEntities;
-using SPO.ColdStorage.Migration.Engine.Model;
 using SPO.ColdStorage.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 {

@@ -1,10 +1,8 @@
 ﻿using Azure.Identity;
 using Microsoft.Graph;
-using Microsoft.Identity.Client;
 using SPO.ColdStorage.Entities;
 using SPO.ColdStorage.Entities.Configuration;
 using SPO.ColdStorage.Entities.DBEntities;
-using SPO.ColdStorage.Migration.Engine.Model;
 using SPO.ColdStorage.Migration.Engine.Utils;
 using SPO.ColdStorage.Models;
 using System.Collections.Concurrent;
@@ -84,11 +82,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 {
                     if (stat.Value.AccessStats != null)
                     {
-                        var file = _model.Documents.Where(f => f.GraphFileInfo.ItemId == stat.Key.ItemId).FirstOrDefault();
-                        if (file != null)
-                        {
-                            file.AccessCount = stat.Value.AccessStats.ActionCount;
-                        }
+                        _model.UpdateDocItem(stat.Key, stat.Value.AccessStats);
                     }
                 }
             }
@@ -103,13 +97,13 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         {
             SiteFile? newFile = null;
 
+
             if (arg is DriveItemSharePointFileInfo)
             {
                 var driveArg = (DriveItemSharePointFileInfo)arg;
 
                 var graphInfo = new GraphFileInfo { DriveId = driveArg.DriveId, ItemId = driveArg.GraphItemId };
                 newFile = new DocumentSiteFile() { FileName = arg.ServerRelativeFilePath, GraphFileInfo = graphInfo };
-
 
                 _pendingMetaFiles.Add(graphInfo);
                 if (_pendingMetaFiles.Count >= MAX_BATCH_PETITIONS)
@@ -129,13 +123,13 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             // Add file to site files list
             await _fileResultsUpdateTaskLock.WaitAsync();
 
-            if (_model.Files.Count % 100 == 0)
+            if (_model.AllFiles.Count % 100 == 0)
             {
-                Console.WriteLine($"Processed {_model.Files.Count} files");
+                Console.WriteLine($"Processed {_model.AllFiles.Count} files");
             }
             try
             {
-                _model.Files.Add(newFile);
+                _model.AddFile(newFile, arg.List);
             }
             finally
             {

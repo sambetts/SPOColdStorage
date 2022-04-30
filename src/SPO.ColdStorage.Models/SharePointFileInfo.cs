@@ -13,6 +13,11 @@ namespace SPO.ColdStorage.Models
         public string SiteUrl { get; set; } = string.Empty;
 
         /// <summary>
+        /// Parent list
+        /// </summary>
+        public SiteList List { get; set; } = new SiteList();
+
+        /// <summary>
         /// Example: https://m365x352268.sharepoint.com/sites/MigrationHost/subsite
         /// </summary>
         public string WebUrl { get; set; } = string.Empty;

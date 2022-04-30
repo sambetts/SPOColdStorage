@@ -1,5 +1,5 @@
 ﻿using Microsoft.Graph;
-using SPO.ColdStorage.Migration.Engine.Model;
+using SPO.ColdStorage.Models;
 using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Text.Json;
