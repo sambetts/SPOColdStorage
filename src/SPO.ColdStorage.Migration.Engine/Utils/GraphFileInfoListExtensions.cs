@@ -1,7 +1,5 @@
-﻿using Microsoft.Graph;
-using SPO.ColdStorage.Models;
+﻿using SPO.ColdStorage.Models;
 using System.Collections.Concurrent;
-using System.Net.Http.Headers;
 using System.Text.Json;
 
 namespace SPO.ColdStorage.Migration.Engine.Utils
@@ -12,24 +10,12 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
         const int MAX_BATCH = 10;
         public static async Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>> GetDriveItemsAnalytics(this List<DriveItemSharePointFileInfo> graphFiles, string baseSiteAddress, ThrottledHttpClient httpClient, DebugTracer tracer)
         {
-            var allReqs = new Dictionary<IBaseRequest, DriveItemSharePointFileInfo>();
-
-
-            // Get back results over X batches
-            var fileResults = await ProcessAllRequestsInParallel(graphFiles, httpClient, baseSiteAddress, tracer);
-
-            return fileResults;
-        }
-
-
-        private static async Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>> ProcessAllRequestsInParallel(List<DriveItemSharePointFileInfo> reqsForFiles, ThrottledHttpClient httpClient, string baseSiteAddress, DebugTracer tracer)
-        {
             var fileSuccessResults = new ConcurrentDictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>();
-            var pendingResults = new ConcurrentBag<DriveItemSharePointFileInfo>(reqsForFiles);
+            var pendingResults = new ConcurrentBag<DriveItemSharePointFileInfo>(graphFiles);
 
             var batchList = new ParallelListProcessor<DriveItemSharePointFileInfo>(MAX_BATCH, 10);      // Limit to just 10 threads of MAX_BATCH for now to avoid heavy throttling
 
-            await batchList.ProcessListInParallel(reqsForFiles, async (threadListChunk, threadIndex) =>
+            await batchList.ProcessListInParallel(graphFiles, async (threadListChunk, threadIndex) =>
             {
                 foreach (var req in threadListChunk)
                 {

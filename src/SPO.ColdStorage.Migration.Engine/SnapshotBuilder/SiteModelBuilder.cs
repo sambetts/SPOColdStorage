@@ -20,9 +20,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         private readonly SPOColdStorageDbContext _db;
         private readonly SiteListFilterConfig _siteFilterConfig;
         private readonly SiteSnapshotModel _model;
-        const int MAX_BATCH_PETITIONS = 20;
 
-        private ConcurrentBag<DriveItemSharePointFileInfo> _pendingMetaFiles = new();
         private SemaphoreSlim _fileResultsUpdateTaskLock = new(1, 1);
         private List<Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>>> _backgroundMetaTasks = new();
         public SiteModelBuilder(ClientSecretCredential app, Config config, DebugTracer debugTracer, TargetMigrationSite site) : base(config, debugTracer)
@@ -62,12 +60,17 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
         public async Task<SiteSnapshotModel> Build()
         {
+            return await Build(null, 100);
+        }
+        public async Task<SiteSnapshotModel> Build(Func<List<DriveItemSharePointFileInfo>>? newFilesCallback, int batchSize)
+        {
             if (!_model.Finished.HasValue)
             {
                 var ctx = await AuthUtils.GetClientContext(_config, _site.RootURL, _tracer);
                 var crawler = new SiteListsAndLibrariesCrawler(ctx, _tracer, Crawler_SharePointFileFound);
-                await crawler.CrawlContextRootWebAndSubwebs(_siteFilterConfig);
 
+                // Begin
+                await crawler.StartCrawl(_siteFilterConfig);
                 _model.Started = DateTime.Now;
 
                 // Get auth for REST
@@ -79,26 +82,37 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 var filesToGetAnalysisFor = true;
                 while (filesToGetAnalysisFor)
                 {
+                    // Check every second
+                    await Task.Delay(1000);
+
+                    // Begin background loading of extra metadata
                     var outstandingFiles = _model.DocsPendingAnalysis;
                     filesToGetAnalysisFor = outstandingFiles.Any();
-
                     _tracer.TrackTrace($"START: Analysing {outstandingFiles.Count.ToString("N0")} files for last-usage...");
+
+
+                    var pendingFilesToAnalyse = new List<DriveItemSharePointFileInfo>();
 
                     foreach (var file in outstandingFiles)
                     {
                         // Avoid analysing more than once
                         file.State = SiteFileAnalysisState.AnalysisInProgress;
 
-                        _pendingMetaFiles.Add(file);
-                        if (_pendingMetaFiles.Count >= MAX_BATCH_PETITIONS)
-                        {
-                            var files = new List<DriveItemSharePointFileInfo>(_pendingMetaFiles);
-                            _pendingMetaFiles.Clear();
+                        pendingFilesToAnalyse.Add(file);
 
-                            // Fire & forget
-                            _backgroundMetaTasks.Add(ProcessMetaChunk(files, httpClient));
+                        // Start new background every $CHUNK_SIZE
+                        if (pendingFilesToAnalyse.Count >= batchSize)
+                        {
+                            var newFileChunkCopy = new List<DriveItemSharePointFileInfo>(pendingFilesToAnalyse);
+                            pendingFilesToAnalyse.Clear();
+
+                            // Background process chunk
+                            _backgroundMetaTasks.Add(ProcessMetaChunk(newFileChunkCopy, httpClient));
                         }
                     }
+
+                    // Background process the rest
+                    _backgroundMetaTasks.Add(ProcessMetaChunk(pendingFilesToAnalyse, httpClient));
 
                     Console.WriteLine("Waiting for background tasks...");
                     await Task.WhenAll(_backgroundMetaTasks);
@@ -139,7 +153,6 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
                 // Pending analysis data
                 newFile = new DocumentSiteFile(driveArg) { State = SiteFileAnalysisState.AnalysisPending };
-
             }
             else
             {
@@ -152,7 +165,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
             if (_model.AllFiles.Count % 100 == 0)
             {
-                Console.WriteLine($"Processed {_model.AllFiles.Count.ToString("N0")} files");
+                Console.WriteLine($"Found {_model.AllFiles.Count.ToString("N0")} files.");
             }
             try
             {
@@ -168,7 +181,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         {
             var stats = await files.GetDriveItemsAnalytics(_site.RootURL, httpClient, _tracer);
 
-            _tracer.TrackTrace($"Updated stats for {files.Count} files.");
+            _tracer.TrackTrace($"Got stats for {files.Count} files.");
             return stats;
 
         }

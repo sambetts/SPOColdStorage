@@ -28,13 +28,12 @@ namespace SPO.ColdStorage.Migration.Engine
 
         #endregion
 
-        public async Task CrawlContextRootWebAndSubwebs(SiteListFilterConfig siteFolderConfig)
+        public async Task StartCrawl(SiteListFilterConfig siteFolderConfig)
         {
             var rootWeb = _spClient.Web;
             await EnsureContextWebIsLoaded();
             _spClient.Load(rootWeb.Webs);
             await _spClient.ExecuteQueryAsyncWithThrottleRetries(_tracer);
-
 
             await ProcessWeb(rootWeb, siteFolderConfig);
 
