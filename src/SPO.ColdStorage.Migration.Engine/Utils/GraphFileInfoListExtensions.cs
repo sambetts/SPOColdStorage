@@ -10,9 +10,9 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
     {
 
         const int MAX_BATCH = 10;
-        public static async Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>> GetDriveItemsAnalytics(this List<GraphFileInfo> graphFiles, string baseSiteAddress, ThrottledHttpClient httpClient, DebugTracer tracer)
+        public static async Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>> GetDriveItemsAnalytics(this List<DriveItemSharePointFileInfo> graphFiles, string baseSiteAddress, ThrottledHttpClient httpClient, DebugTracer tracer)
         {
-            var allReqs = new Dictionary<IBaseRequest, GraphFileInfo>();
+            var allReqs = new Dictionary<IBaseRequest, DriveItemSharePointFileInfo>();
 
 
             // Get back results over X batches
@@ -22,18 +22,18 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
         }
 
 
-        private static async Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>> ProcessAllRequestsInParallel(List<GraphFileInfo> reqsForFiles, ThrottledHttpClient httpClient, string baseSiteAddress, DebugTracer tracer)
+        private static async Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>> ProcessAllRequestsInParallel(List<DriveItemSharePointFileInfo> reqsForFiles, ThrottledHttpClient httpClient, string baseSiteAddress, DebugTracer tracer)
         {
-            var fileSuccessResults = new ConcurrentDictionary<GraphFileInfo, ItemAnalyticsRepsonse>();
-            var pendingResults = new ConcurrentBag<GraphFileInfo>(reqsForFiles);
+            var fileSuccessResults = new ConcurrentDictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>();
+            var pendingResults = new ConcurrentBag<DriveItemSharePointFileInfo>(reqsForFiles);
 
-            var batchList = new ParallelListProcessor<GraphFileInfo>(MAX_BATCH, 10);      // Limit to just 10 threads of MAX_BATCH for now to avoid heavy throttling
+            var batchList = new ParallelListProcessor<DriveItemSharePointFileInfo>(MAX_BATCH, 10);      // Limit to just 10 threads of MAX_BATCH for now to avoid heavy throttling
 
             await batchList.ProcessListInParallel(reqsForFiles, async (threadListChunk, threadIndex) =>
             {
                 foreach (var req in threadListChunk)
                 {
-                    var url = $"{baseSiteAddress}/_api/v2.0/drives/{req.DriveId}/items/{req.ItemId}" +
+                    var url = $"{baseSiteAddress}/_api/v2.0/drives/{req.DriveId}/items/{req.GraphItemId}" +
                         $"/analytics/allTime";
 
                     try
@@ -51,12 +51,12 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
                     catch (HttpRequestException ex)
                     {
                         tracer.TrackException(ex);
-                        tracer.TrackTrace($"Got exception {ex.Message} getting analytics data for drive item {req.ItemId}", Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Error);
+                        tracer.TrackTrace($"Got exception {ex.Message} getting analytics data for drive item {req.GraphItemId}", Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Error);
                     }
                 }
             });
 
-            return new Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>(fileSuccessResults);
+            return new Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>(fileSuccessResults);
         }
 
     }

@@ -13,18 +13,18 @@ namespace SPO.ColdStorage.Models
 
         public List<SiteList> Lists { get; set; } = new List<SiteList> { };
         public List<DocLib> DocLibs => Lists.Where(f => f.GetType() == typeof(DocLib)).Cast<DocLib>().ToList();
-        public List<SiteFile> AllFiles => Lists.SelectMany(l => l.Files).ToList();
+        public List<SharePointFileInfo> AllFiles => Lists.SelectMany(l => l.Files).ToList();
 
         public List<DocumentSiteFile> DocsPendingAnalysis => AllFiles
             .Where(f=> f is DocumentSiteFile && ((DocumentSiteFile)f).State == SiteFileAnalysisState.AnalysisPending).Cast<DocumentSiteFile>().ToList();
 
 
-        public void UpdateDocItem(GraphFileInfo key, ItemAnalyticsRepsonse.AnalyticsItemActionStat accessStats)
+        public void UpdateDocItem(DriveItemSharePointFileInfo updatedDocInfo, ItemAnalyticsRepsonse.AnalyticsItemActionStat accessStats)
         {
-            var docLib = DocLibs.Where(l => l.DriveId == key.DriveId).SingleOrDefault();
-            if (docLib == null) throw new ArgumentOutOfRangeException(nameof(key), $"No library in model for drive Id {key.DriveId}");
+            var docLib = DocLibs.Where(l => l.DriveId == updatedDocInfo.DriveId).SingleOrDefault();
+            if (docLib == null) throw new ArgumentOutOfRangeException(nameof(updatedDocInfo), $"No library in model for drive Id {updatedDocInfo.DriveId}");
 
-            var file = docLib.Documents.Where(d=> d.GraphFileInfo.ItemId == key.ItemId).SingleOrDefault();
+            var file = docLib.Documents.Where(d=> d.GraphItemId == updatedDocInfo.GraphItemId).SingleOrDefault();
             if (file != null)
             {
                 file.AccessCount = accessStats.ActionCount;
@@ -32,11 +32,11 @@ namespace SPO.ColdStorage.Models
             }
             else
             {
-                throw new ArgumentOutOfRangeException(nameof(key), $"No doc in model doc-lib with item Id {key.ItemId}");
+                throw new ArgumentOutOfRangeException(nameof(updatedDocInfo), $"No doc in model doc-lib with item Id {updatedDocInfo.GraphItemId}");
             }
         }
 
-        public void AddFile(SiteFile newFile, SiteList list)
+        public void AddFile(SharePointFileInfo newFile, SiteList list)
         {
             lock (this)
             {
@@ -63,7 +63,7 @@ namespace SPO.ColdStorage.Models
 
         public string Title { get; set; } = string.Empty;
         public string ServerRelativeUrl { get; set; } = string.Empty;
-        public List<SiteFile> Files { get; set; } = new List<SiteFile>();
+        public List<SharePointFileInfo> Files { get; set; } = new List<SharePointFileInfo>();
 
         public bool Equals(SiteList? other)
         {
@@ -91,18 +91,6 @@ namespace SPO.ColdStorage.Models
         public string Delta { get; set; } = string.Empty;
     }
 
-    public class SiteFile
-    {
-        public SiteFile() 
-        {
-        }
-        public SiteFile(SiteFile d) : this()
-        {
-            this.FileName = d.FileName;
-        }
-
-        public string FileName { get; set; } = string.Empty;
-    }
     public enum SiteFileAnalysisState
     {
         Unknown,
@@ -111,29 +99,16 @@ namespace SPO.ColdStorage.Models
         Complete
     }
 
-    public class DocumentSiteFile : SiteFile
+    public class DocumentSiteFile : DriveItemSharePointFileInfo
     {
-        public SiteFileAnalysisState State { get; set; } = SiteFileAnalysisState.Unknown;
-        public DocumentSiteFile() { }
-        public DocumentSiteFile(SiteFile d) : base(d)
+        public DocumentSiteFile(DriveItemSharePointFileInfo driveArg) :base(driveArg)
         {
-            if (d is DocumentSiteFile)
-            {
-                var graphFileInfo = (DocumentSiteFile)d;
-                GraphFileInfo = graphFileInfo.GraphFileInfo;
-                AccessCount = graphFileInfo.AccessCount;
-                State = graphFileInfo.State;
-            }
+            this.AccessCount = null;
         }
 
-        public GraphFileInfo GraphFileInfo { get; set; } = new GraphFileInfo();
-        public int? AccessCount { get; set; }
-    }
+        public SiteFileAnalysisState State { get; set; } = SiteFileAnalysisState.Unknown;
 
-    public class GraphFileInfo
-    {
-        public string DriveId { get; set; } = string.Empty;
-        public string ItemId { get; set; } = string.Empty;
+        public int? AccessCount { get; set; } = null;
     }
 
 

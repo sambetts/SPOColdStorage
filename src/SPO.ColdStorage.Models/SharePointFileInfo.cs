@@ -3,10 +3,22 @@
 namespace SPO.ColdStorage.Models
 {
     /// <summary>
-    /// SharePoint Online file metadata
+    /// SharePoint Online file metadata for base file-type
     /// </summary>
     public class SharePointFileInfo 
     {
+        public SharePointFileInfo() { }
+        public SharePointFileInfo(SharePointFileInfo driveArg) : this()
+        {
+            this.SiteUrl = driveArg.SiteUrl;
+            this.List = driveArg.List;
+            this.WebUrl = driveArg.WebUrl;
+            this.ServerRelativeFilePath = driveArg.ServerRelativeFilePath;
+            this.Author = driveArg.Author;
+            this.Subfolder = driveArg.Subfolder;
+            this.LastModified = driveArg.LastModified;
+        }
+
         /// <summary>
         /// Example: https://m365x352268.sharepoint.com/sites/MigrationHost
         /// </summary>
@@ -63,6 +75,11 @@ namespace SPO.ColdStorage.Models
             }
         }
 
+        public override string ToString()
+        {
+            return $"{this.ServerRelativeFilePath}";
+        }
+
         /// <summary>
         /// Calculated. Web + file URL, minus overlap, if both are valid.
         /// </summary>
@@ -99,6 +116,13 @@ namespace SPO.ColdStorage.Models
 
     public class DriveItemSharePointFileInfo : SharePointFileInfo
     {
+        public DriveItemSharePointFileInfo() { }
+        public DriveItemSharePointFileInfo(DriveItemSharePointFileInfo driveArg) : base(driveArg)
+        {
+            this.DriveId = driveArg.DriveId;
+            this.GraphItemId = driveArg.GraphItemId;
+        }
+
         public string DriveId { get; set; } = string.Empty;
         public string GraphItemId { get; set; } = string.Empty;
     }

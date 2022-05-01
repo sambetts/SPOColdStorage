@@ -22,9 +22,9 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         private readonly SiteSnapshotModel _model;
         const int MAX_BATCH_PETITIONS = 20;
 
-        private ConcurrentBag<GraphFileInfo> _pendingMetaFiles = new();
+        private ConcurrentBag<DriveItemSharePointFileInfo> _pendingMetaFiles = new();
         private SemaphoreSlim _fileResultsUpdateTaskLock = new(1, 1);
-        private List<Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>>> _backgroundMetaTasks = new();
+        private List<Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>>> _backgroundMetaTasks = new();
         public SiteModelBuilder(ClientSecretCredential app, Config config, DebugTracer debugTracer, TargetMigrationSite site) : base(config, debugTracer)
         {
             this._site = site;
@@ -89,10 +89,10 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                         // Avoid analysing more than once
                         file.State = SiteFileAnalysisState.AnalysisInProgress;
 
-                        _pendingMetaFiles.Add(file.GraphFileInfo);
+                        _pendingMetaFiles.Add(file);
                         if (_pendingMetaFiles.Count >= MAX_BATCH_PETITIONS)
                         {
-                            var files = new List<GraphFileInfo>(_pendingMetaFiles);
+                            var files = new List<DriveItemSharePointFileInfo>(_pendingMetaFiles);
                             _pendingMetaFiles.Clear();
 
                             // Fire & forget
@@ -131,22 +131,20 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
         private async Task Crawler_SharePointFileFound(SharePointFileInfo arg)
         {
-            SiteFile? newFile = null;
+            SharePointFileInfo? newFile = null;
 
             if (arg is DriveItemSharePointFileInfo)
             {
                 var driveArg = (DriveItemSharePointFileInfo)arg;
 
-                var graphInfo = new GraphFileInfo { DriveId = driveArg.DriveId, ItemId = driveArg.GraphItemId };
-
                 // Pending analysis data
-                newFile = new DocumentSiteFile() { FileName = arg.ServerRelativeFilePath, GraphFileInfo = graphInfo, State = SiteFileAnalysisState.AnalysisPending };
+                newFile = new DocumentSiteFile(driveArg) { State = SiteFileAnalysisState.AnalysisPending };
 
             }
             else
             {
                 // Nothing to analyse for list item attachments
-                newFile = new SiteFile() { FileName = arg.ServerRelativeFilePath };
+                newFile = arg;
             }
 
             // Add file to site files list
@@ -166,7 +164,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             }
         }
 
-        private async Task<Dictionary<GraphFileInfo, ItemAnalyticsRepsonse>> ProcessMetaChunk(List<GraphFileInfo> files, ThrottledHttpClient httpClient)
+        private async Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>> ProcessMetaChunk(List<DriveItemSharePointFileInfo> files, ThrottledHttpClient httpClient)
         {
             var stats = await files.GetDriveItemsAnalytics(_site.RootURL, httpClient, _tracer);
 
