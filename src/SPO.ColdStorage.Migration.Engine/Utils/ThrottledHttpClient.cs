@@ -11,6 +11,7 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
     /// </summary>
     public class SecureSPThrottledHttpClient : HttpClient
     {
+        private readonly bool ignoreRetryHeader;
         private readonly DebugTracer debugTracer;
         #region Constructor, Props, and Privates
 
@@ -19,9 +20,10 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
         private object _concurrentCallsObj = new object(), _throttledCallsObject = new object(), _completedCallsObject = new object();
 
 
-        public SecureSPThrottledHttpClient(Config config, DebugTracer debugTracer) : base(new SecureSPHandler(config, debugTracer))
+        public SecureSPThrottledHttpClient(Config config, bool ignoreRetryHeader, DebugTracer debugTracer) : base(new SecureSPHandler(config, debugTracer))
         { 
             this.Timeout = TimeSpan.FromHours(1);
+            this.ignoreRetryHeader = ignoreRetryHeader;
             this.debugTracer = debugTracer;
         }
 
@@ -114,7 +116,7 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
 
                     // Do we have a "retry-after" header?
                     var waitValue = response.GetRetryAfterHeaderSeconds();
-                    if (waitValue.HasValue)
+                    if (!ignoreRetryHeader && waitValue.HasValue)
                     {
                         secondsToWait = waitValue.Value;
                         debugTracer.TrackTrace($"{Constants.THROTTLE_ERROR} for {url}. Waiting to retry for attempt #{retries} (from 'retry-after' header)...",
@@ -135,9 +137,9 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
 
                         // We've not reached throttling max retries...keep retrying
                         debugTracer.TrackTrace($"{Constants.THROTTLE_ERROR} downloading from REST. Waiting {retries} seconds to try again...",
-                            Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Verbose);
+                            Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Information);
 
-                        secondsToWait = retries;
+                        secondsToWait = retries * 2;
                     }
 
                     // Wait before trying again

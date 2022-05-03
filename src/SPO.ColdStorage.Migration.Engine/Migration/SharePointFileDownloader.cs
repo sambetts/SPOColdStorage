@@ -16,7 +16,7 @@ namespace SPO.ColdStorage.Migration.Engine.Migration
         public SharePointFileDownloader(IConfidentialClientApplication app, Config config, DebugTracer debugTracer) : base(config, debugTracer)
         {
             _app = app;
-            _client = new SecureSPThrottledHttpClient(config, debugTracer);
+            _client = new SecureSPThrottledHttpClient(config, true, debugTracer);
 
             var productValue = new ProductInfoHeaderValue("SPOColdStorageMigration", "1.0");
             var commentValue = new ProductInfoHeaderValue("(+https://github.com/sambetts/SPOColdStorage)");

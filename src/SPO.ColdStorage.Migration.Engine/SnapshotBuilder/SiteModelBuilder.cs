@@ -30,7 +30,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             this._site = site;
             _db = new SPOColdStorageDbContext(this._config);
             _model = new SiteSnapshotModel();
-            _httpClient = new SecureSPThrottledHttpClient(_config, _tracer);
+            _httpClient = new SecureSPThrottledHttpClient(_config, true, _tracer);
 
             // Figure out what to analyse
             SiteListFilterConfig? siteFilterConfig = null;

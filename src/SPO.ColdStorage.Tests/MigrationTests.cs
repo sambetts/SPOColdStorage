@@ -68,7 +68,7 @@ namespace SPO.ColdStorage.Tests
             var creds = new ClientSecretCredential(_config.AzureAdConfig.TenantId, _config.AzureAdConfig.ClientID, _config.AzureAdConfig.Secret);
             var gc = new GraphServiceClient(creds);
 
-            var httpClient = new SecureSPThrottledHttpClient(_config!, DebugTracer.ConsoleOnlyTracer());
+            var httpClient = new SecureSPThrottledHttpClient(_config!, false, DebugTracer.ConsoleOnlyTracer());
 
             // Test batch method with files in doc-lib
             var driveItems = await gc.Drives[uploaded.File.VroomDriveID].Root.Children.Request().GetAsync();
