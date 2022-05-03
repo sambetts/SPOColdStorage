@@ -6,38 +6,42 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
 {
     public static class GraphFileInfoListExtensions
     {
-
         const int MAX_BATCH = 10;
-        public static async Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>> GetDriveItemsAnalytics(this List<DriveItemSharePointFileInfo> graphFiles, string baseSiteAddress, ThrottledHttpClient httpClient, DebugTracer tracer)
+        public static async Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>> GetDriveItemsAnalytics(this List<DocumentSiteFile> graphFiles, string baseSiteAddress, ThrottledHttpClient httpClient, DebugTracer tracer)
         {
             var fileSuccessResults = new ConcurrentDictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>();
             var pendingResults = new ConcurrentBag<DriveItemSharePointFileInfo>(graphFiles);
 
-            var batchList = new ParallelListProcessor<DriveItemSharePointFileInfo>(MAX_BATCH, 10);      // Limit to just 10 threads of MAX_BATCH for now to avoid heavy throttling
+            var batchList = new ParallelListProcessor<DocumentSiteFile>(MAX_BATCH, 1);
 
             await batchList.ProcessListInParallel(graphFiles, async (threadListChunk, threadIndex) =>
             {
-                foreach (var req in threadListChunk)
+                foreach (var fileToUpdate in threadListChunk)
                 {
-                    var url = $"{baseSiteAddress}/_api/v2.0/drives/{req.DriveId}/items/{req.GraphItemId}" +
+                    // Read doc analytics
+                    var url = $"{baseSiteAddress}/_api/v2.0/drives/{fileToUpdate.DriveId}/items/{fileToUpdate.GraphItemId}" +
                         $"/analytics/allTime";
 
                     try
                     {
-                        using (var r = await httpClient.GetAsyncWithThrottleRetries(url, tracer))
+                        // Do our own parsing as Graph SDK doesn't do this very well
+                        using (var analyticsResponse = await httpClient.GetAsyncWithThrottleRetries(url, tracer))
                         {
-                            var body = await r.Content.ReadAsStringAsync();
+                            var analyticsResponseBody = await analyticsResponse.Content.ReadAsStringAsync();
 
-                            r.EnsureSuccessStatusCode();
+                            analyticsResponse.EnsureSuccessStatusCode();
 
-                            var activitiesResponse = JsonSerializer.Deserialize<ItemAnalyticsRepsonse>(body) ?? new ItemAnalyticsRepsonse();
-                            fileSuccessResults.AddOrUpdate(req, activitiesResponse, (index, oldVal) => activitiesResponse);
+                            var activitiesResponse = JsonSerializer.Deserialize<ItemAnalyticsRepsonse>(analyticsResponseBody) ?? new ItemAnalyticsRepsonse();
+                            fileSuccessResults.AddOrUpdate(fileToUpdate, activitiesResponse, (index, oldVal) => activitiesResponse);
+
+                            await Task.Delay(100);
                         }
                     }
                     catch (HttpRequestException ex)
                     {
+                        fileToUpdate.State = SiteFileAnalysisState.Error;
                         tracer.TrackException(ex);
-                        tracer.TrackTrace($"Got exception {ex.Message} getting analytics data for drive item {req.GraphItemId}", Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Error);
+                        tracer.TrackTrace($"Got exception {ex.Message} getting analytics data for drive item {fileToUpdate.GraphItemId}", Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Error);
                     }
                 }
             });

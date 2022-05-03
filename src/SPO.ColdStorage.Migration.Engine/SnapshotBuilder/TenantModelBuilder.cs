@@ -16,7 +16,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         {
             using (var db = new SPOColdStorageDbContext(this._config))
             {
-                var tenantModel = new Snapshot();
+                var tenantModel = new SiteSnapshot();
                 var siteTasks = new List<Task<SiteSnapshotModel>>();
                 var sitesToAnalyse = await db.TargetSharePointSites.ToListAsync();
 
@@ -45,7 +45,12 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             {
                 using (var db = new SPOColdStorageDbContext(this._config))
                 {
-                    _tracer.TrackTrace($"Adding {files.Count} to DB");
+                }
+            }, updatedFiles => 
+            {
+                using (var db = new SPOColdStorageDbContext(this._config))
+                {
+                    _tracer.TrackTrace($"Updating {updatedFiles.Count} to DB");
                 }
             });
         }

@@ -76,8 +76,8 @@ namespace SPO.ColdStorage.Tests
             // Test batch method with files in doc-lib
             var driveItems = await gc.Drives[uploaded.File.VroomDriveID].Root.Children.Request().GetAsync();
 
-            var graphFileInfoList = new System.Collections.Generic.List<DriveItemSharePointFileInfo>();
-            var graphFiles = driveItems.Select(d => new DriveItemSharePointFileInfo { DriveId = uploaded.File.VroomDriveID, GraphItemId = d.Id });
+            var graphFileInfoList = new System.Collections.Generic.List<DocumentSiteFile>();
+            var graphFiles = driveItems.Select(d => new DocumentSiteFile { DriveId = uploaded.File.VroomDriveID, GraphItemId = d.Id });
             graphFileInfoList.AddRange(graphFiles);
 
             var batchAnalytics = await graphFileInfoList.GetDriveItemsAnalytics(_config!.DevConfig.DefaultSharePointSite, httpClient, _tracer);
