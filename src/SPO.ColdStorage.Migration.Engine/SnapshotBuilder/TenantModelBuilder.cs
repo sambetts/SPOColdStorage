@@ -1,5 +1,4 @@
-﻿using Azure.Identity;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using SPO.ColdStorage.Entities;
 using SPO.ColdStorage.Entities.Configuration;
 using SPO.ColdStorage.Entities.DBEntities;
@@ -15,8 +14,6 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
         public async Task Build()
         {
-            var app = new ClientSecretCredential(_config.AzureAdConfig.TenantId, _config.AzureAdConfig.ClientID, _config.AzureAdConfig.Secret);
-
             using (var db = new SPOColdStorageDbContext(this._config))
             {
                 var tenantModel = new Snapshot();
@@ -28,11 +25,11 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                     _tracer.TrackTrace($"No sites configured to snapshot.");
                 }
                 else
-                    _tracer.TrackTrace($"Taking snapshot of {sitesToAnalyse.Count} sites:");
+                    _tracer.TrackTrace($"Taking snapshot of {sitesToAnalyse.Count} site(s):");
                 foreach (var s in sitesToAnalyse)
                 {
                     _tracer.TrackTrace($"--{s.RootURL}");
-                    siteTasks.Add(StartSiteAnalysis(s, app));
+                    siteTasks.Add(StartSiteAnalysisAsync(s));
                 }
 
                 await Task.WhenAll(siteTasks);
@@ -40,11 +37,17 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             }
         }
 
-        private async Task<SiteSnapshotModel> StartSiteAnalysis(TargetMigrationSite site, ClientSecretCredential app)
+        private async Task<SiteSnapshotModel> StartSiteAnalysisAsync(TargetMigrationSite site)
         {
-            var s = new SiteModelBuilder(app, base._config, base._tracer, site);
+            var s = new SiteModelBuilder(base._config, base._tracer, site);
 
-            return await s.Build();
+            return await s.Build(100, files => 
+            {
+                using (var db = new SPOColdStorageDbContext(this._config))
+                {
+                    _tracer.TrackTrace($"Adding {files.Count} to DB");
+                }
+            });
         }
     }
 }

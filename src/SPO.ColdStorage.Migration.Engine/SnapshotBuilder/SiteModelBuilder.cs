@@ -1,10 +1,8 @@
-﻿using Azure.Identity;
-using SPO.ColdStorage.Entities;
+﻿using SPO.ColdStorage.Entities;
 using SPO.ColdStorage.Entities.Configuration;
 using SPO.ColdStorage.Entities.DBEntities;
 using SPO.ColdStorage.Migration.Engine.Utils;
 using SPO.ColdStorage.Models;
-using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 
 namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
@@ -21,9 +19,10 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         private readonly SiteListFilterConfig _siteFilterConfig;
         private readonly SiteSnapshotModel _model;
 
+        private List<SharePointFileInfo> _fileFoundBuffer = new();
         private SemaphoreSlim _fileResultsUpdateTaskLock = new(1, 1);
         private List<Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>>> _backgroundMetaTasks = new();
-        public SiteModelBuilder(ClientSecretCredential app, Config config, DebugTracer debugTracer, TargetMigrationSite site) : base(config, debugTracer)
+        public SiteModelBuilder(Config config, DebugTracer debugTracer, TargetMigrationSite site) : base(config, debugTracer)
         {
             this._site = site;
             _db = new SPOColdStorageDbContext(this._config);
@@ -60,18 +59,25 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
         public async Task<SiteSnapshotModel> Build()
         {
-            return await Build(null, 100);
+            return await Build(100, null);
         }
-        public async Task<SiteSnapshotModel> Build(Func<List<DriveItemSharePointFileInfo>>? newFilesCallback, int batchSize)
+        public async Task<SiteSnapshotModel> Build(int batchSize, Action<List<SharePointFileInfo>>? newFilesCallback)
         {
+            if (batchSize < 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(batchSize));
+            }
+
             if (!_model.Finished.HasValue)
             {
                 var ctx = await AuthUtils.GetClientContext(_config, _site.RootURL, _tracer);
-                var crawler = new SiteListsAndLibrariesCrawler(ctx, _tracer, Crawler_SharePointFileFound);
 
-                // Begin
-                await crawler.StartCrawl(_siteFilterConfig);
+                var crawler = new SiteListsAndLibrariesCrawler(ctx, _tracer, 
+                    (SharePointFileInfo foundFile) => Crawler_SharePointFileFound(foundFile, batchSize, newFilesCallback));
+
+                // Begin and block until all files crawled
                 _model.Started = DateTime.Now;
+                await crawler.StartCrawl(_siteFilterConfig);
 
                 // Get auth for REST
                 var app = await AuthUtils.GetNewClientApp(_config);
@@ -89,7 +95,6 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                     var outstandingFiles = _model.DocsPendingAnalysis;
                     filesToGetAnalysisFor = outstandingFiles.Any();
                     _tracer.TrackTrace($"START: Analysing {outstandingFiles.Count.ToString("N0")} files for last-usage...");
-
 
                     var pendingFilesToAnalyse = new List<DriveItemSharePointFileInfo>();
 
@@ -143,33 +148,40 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         }
 
 
-        private async Task Crawler_SharePointFileFound(SharePointFileInfo arg)
+        private async Task Crawler_SharePointFileFound(SharePointFileInfo foundFile, int batchSize, Action<List<SharePointFileInfo>>? newFilesCallback)
         {
             SharePointFileInfo? newFile = null;
 
-            if (arg is DriveItemSharePointFileInfo)
+            if (foundFile is DriveItemSharePointFileInfo)
             {
-                var driveArg = (DriveItemSharePointFileInfo)arg;
+                var driveArg = (DriveItemSharePointFileInfo)foundFile;
 
-                // Pending analysis data
+                // Set newly found file as "pending" analysis data
                 newFile = new DocumentSiteFile(driveArg) { State = SiteFileAnalysisState.AnalysisPending };
             }
             else
             {
                 // Nothing to analyse for list item attachments
-                newFile = arg;
+                newFile = foundFile;
             }
 
-            // Add file to site files list
+            // Ensure only single thread execution 
             await _fileResultsUpdateTaskLock.WaitAsync();
 
-            if (_model.AllFiles.Count % 100 == 0)
-            {
-                Console.WriteLine($"Found {_model.AllFiles.Count.ToString("N0")} files.");
-            }
             try
             {
-                _model.AddFile(newFile, arg.List);
+                // Add new found files to model & event buffer
+                _fileFoundBuffer.Add(newFile);
+                _model.AddFile(newFile, foundFile.List);
+
+                if (_fileFoundBuffer.Count == batchSize)
+                {
+                    if (newFilesCallback != null)
+                    {
+                        newFilesCallback(new List<SharePointFileInfo>(_fileFoundBuffer));
+                    }
+                    _fileFoundBuffer.Clear();
+                }
             }
             finally
             {
