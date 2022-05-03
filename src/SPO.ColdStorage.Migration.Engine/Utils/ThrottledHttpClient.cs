@@ -1,18 +1,29 @@
 ﻿
 
+using Microsoft.Identity.Client;
+using SPO.ColdStorage.Entities.Configuration;
+using System.Net.Http.Headers;
+
 namespace SPO.ColdStorage.Migration.Engine.Utils
 {
-
-    public class ThrottledHttpClient : HttpClient
+    /// <summary>
+    /// HttpClient that can handle HTTP 429s automatically
+    /// </summary>
+    public class SecureSPThrottledHttpClient : HttpClient
     {
+        private readonly DebugTracer debugTracer;
         #region Constructor, Props, and Privates
 
-        public ThrottledHttpClient()
-        { 
-        }
-        private DateTime? _nextCallEarliestTime = null, _throttleSet = null;
+        private DateTime? _nextCallEarliestTime = null;
         private int _concurrentCalls = 0, _throttledCalls = 0, _completedCalls = 0;
         private object _concurrentCallsObj = new object(), _throttledCallsObject = new object(), _completedCallsObject = new object();
+
+
+        public SecureSPThrottledHttpClient(Config config, DebugTracer debugTracer) : base(new SecureSPHandler(config, debugTracer))
+        { 
+            this.Timeout = TimeSpan.FromHours(1);
+            this.debugTracer = debugTracer;
+        }
 
         public int ConcurrentCalls
         {
@@ -45,12 +56,13 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
                 }
             }
         }
+
         #endregion
 
         /// <summary>
         /// Execute a method that returns a HttpResponseMessage, with throttling retry logic
         /// </summary>
-        public async Task<HttpResponseMessage> ExecuteHttpCallWithThrottleRetries(Func<Task<HttpResponseMessage>> httpAction, string url, DebugTracer debugTracer)
+        public async Task<HttpResponseMessage> ExecuteHttpCallWithThrottleRetries(Func<Task<HttpResponseMessage>> httpAction, string url)
         {
             HttpResponseMessage? response = null;
             int retries = 0, secondsToWait = 0;
@@ -87,7 +99,7 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
                 // Get response but don't buffer full content (which will buffer overlflow for large files)
                 response = await httpAction();
 
-                lock (this)
+                lock (_concurrentCallsObj)
                 {
                     _concurrentCalls--;
                 }
@@ -131,7 +143,6 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
                     // Wait before trying again
                     lock (this)
                     {
-                        _throttleSet = DateTime.Now;
                         _nextCallEarliestTime = DateTime.Now.AddSeconds(secondsToWait);
                     }
 
@@ -151,6 +162,32 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
             return response!;
         }
 
+    }
+
+    public class SecureSPHandler : DelegatingHandler
+    {
+        protected Config _config;
+        private AuthenticationResult? auth = null;
+        public SecureSPHandler(Config config, DebugTracer debugTracer)
+        {
+            this._config = config;
+            InnerHandler = new HttpClientHandler();
+        }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+
+            // Get auth for REST
+            var app = await AuthUtils.GetNewClientApp(_config);
+
+            if (auth == null || auth.ExpiresOn < DateTimeOffset.Now.AddMinutes(5))
+            {
+                auth = await app.AuthForSharePointOnline(_config.BaseServerAddress);
+            }
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+
+            return await base.SendAsync(request, cancellationToken);
+        }
 
     }
 }

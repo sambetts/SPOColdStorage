@@ -7,12 +7,12 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
     public static class GraphFileInfoListExtensions
     {
         const int MAX_BATCH = 10;
-        public static async Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>> GetDriveItemsAnalytics(this List<DocumentSiteFile> graphFiles, string baseSiteAddress, ThrottledHttpClient httpClient, DebugTracer tracer)
+        public static async Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>> GetDriveItemsAnalytics(this List<DocumentSiteFile> graphFiles, string baseSiteAddress, SecureSPThrottledHttpClient httpClient, DebugTracer tracer)
         {
             var fileSuccessResults = new ConcurrentDictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>();
             var pendingResults = new ConcurrentBag<DriveItemSharePointFileInfo>(graphFiles);
 
-            var batchList = new ParallelListProcessor<DocumentSiteFile>(MAX_BATCH, 1);
+            var batchList = new ParallelListProcessor<DocumentSiteFile>(MAX_BATCH, 10);
 
             await batchList.ProcessListInParallel(graphFiles, async (threadListChunk, threadIndex) =>
             {

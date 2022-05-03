@@ -18,7 +18,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         private readonly SPOColdStorageDbContext _db;
         private readonly SiteListFilterConfig _siteFilterConfig;
         private readonly SiteSnapshotModel _model;
-        private ThrottledHttpClient _httpClient;
+        private SecureSPThrottledHttpClient _httpClient;
 
         private bool _processBackgroundDocQueue = false;
         private bool _showStats = false;
@@ -30,7 +30,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             this._site = site;
             _db = new SPOColdStorageDbContext(this._config);
             _model = new SiteSnapshotModel();
-            _httpClient = new ThrottledHttpClient();
+            _httpClient = new SecureSPThrottledHttpClient(_config, _tracer);
 
             // Figure out what to analyse
             SiteListFilterConfig? siteFilterConfig = null;
@@ -75,11 +75,6 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             if (!_model.Finished.HasValue)
             {
                 var ctx = await AuthUtils.GetClientContext(_config, _site.RootURL, _tracer);
-
-                // Get auth for REST
-                var app = await AuthUtils.GetNewClientApp(_config);
-                var auth = await app.AuthForSharePointOnline(_config.BaseServerAddress);
-                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
 
                 var crawler = new SiteListsAndLibrariesCrawler(ctx, _tracer,
                     (SharePointFileInfo foundFile) => Crawler_SharePointFileFound(foundFile, batchSize, newFilesCallback));
@@ -216,14 +211,14 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                     pendingFilesToAnalyse.Clear();
 
                     // Background process chunk
-                    backgroundMetaTasksThisChunk.Add(ProcessMetaChunk(newFileChunkCopy, _httpClient));
+                    backgroundMetaTasksThisChunk.Add(newFileChunkCopy.GetDriveItemsAnalytics(_site.RootURL, _httpClient, _tracer));
                 }
             }
 
             // Background process the rest
             if (pendingFilesToAnalyse.Count > 0)
             {
-                backgroundMetaTasksThisChunk.Add(ProcessMetaChunk(pendingFilesToAnalyse, _httpClient));
+                backgroundMetaTasksThisChunk.Add(pendingFilesToAnalyse.GetDriveItemsAnalytics(_site.RootURL, _httpClient, _tracer));
             }
 
             // Update global tasks
@@ -248,14 +243,17 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             }
 
             // Update model & fire event
+            var updatedFiles = new List<SharePointFileInfo>(); 
             foreach (var fileUpdated in updates)
             {
                 lock (this)
                 {
                     // Update model
-                    _model.UpdateDocItem(fileUpdated.Key, fileUpdated.Value);
+                    updatedFiles.Add(_model.UpdateDocItem(fileUpdated.Key, fileUpdated.Value));
                 }
             }
+
+            filesUpdatedCallback?.Invoke(updatedFiles);
         }
 
         private Task Crawler_SharePointFileFound(SharePointFileInfo foundFile, int batchSize, Action<List<SharePointFileInfo>>? newFilesCallback)
@@ -297,14 +295,6 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             }
 
             return Task.CompletedTask;
-        }
-
-
-        private async Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>> ProcessMetaChunk(List<DocumentSiteFile> files, ThrottledHttpClient httpClient)
-        {
-            var stats = await files.GetDriveItemsAnalytics(_site.RootURL, httpClient, _tracer);
-            return stats;
-
         }
     }
 }

@@ -12,12 +12,11 @@ namespace SPO.ColdStorage.Migration.Engine.Migration
     public class SharePointFileDownloader : BaseComponent
     {
         private readonly IConfidentialClientApplication _app;
-        private readonly ThrottledHttpClient _client;
+        private readonly SecureSPThrottledHttpClient _client;
         public SharePointFileDownloader(IConfidentialClientApplication app, Config config, DebugTracer debugTracer) : base(config, debugTracer)
         {
             _app = app;
-            _client = new ThrottledHttpClient();
-
+            _client = new SecureSPThrottledHttpClient(config, debugTracer);
 
             var productValue = new ProductInfoHeaderValue("SPOColdStorageMigration", "1.0");
             var commentValue = new ProductInfoHeaderValue("(+https://github.com/sambetts/SPOColdStorage)");
@@ -40,9 +39,6 @@ namespace SPO.ColdStorage.Migration.Engine.Migration
             var tempFileName = GetTempFileNameAndCreateDir(sharePointFile);
 
             _tracer.TrackTrace($"Downloading '{sharePointFile.FullSharePointUrl}'...", Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Verbose);
-
-            var auth = await _app.AuthForSharePointOnline(_config.BaseServerAddress);
-            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
             var url = $"{sharePointFile.WebUrl}/_api/web/GetFileByServerRelativeUrl('{sharePointFile.ServerRelativeFilePath}')/OpenBinaryStream";
 
             long fileSize = 0;
