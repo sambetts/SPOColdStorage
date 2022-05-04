@@ -8,6 +8,7 @@ namespace SPO.ColdStorage.Entities.Abstract
     /// </summary>
     public abstract class BaseDBObject
     {
+        public bool IsUnsaved => this.ID > 0;
 
         [Key]
         [Column("id")]
@@ -35,6 +36,6 @@ namespace SPO.ColdStorage.Entities.Abstract
         public int FileId { get; set; }
 
         [Required]
-        public DBEntities.File File { get; set; } = new DBEntities.File();
+        public DBEntities.SPFile File { get; set; } = new DBEntities.SPFile();
     }
 }

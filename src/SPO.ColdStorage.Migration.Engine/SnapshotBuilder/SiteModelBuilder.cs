@@ -22,7 +22,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
         private bool _processBackgroundDocQueue = false;
         private bool _showStats = false;
-        private List<DocumentSiteFile> _outstandingFilesBuffer = new();
+        private List<SharePointFileInfo> _outstandingFilesBuffer = new();
         private List<SharePointFileInfo> _fileFoundBuffer = new();
         private List<Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>>> _backgroundMetaTasks = new();
         public SiteModelBuilder(Config config, DebugTracer debugTracer, TargetMigrationSite site) : base(config, debugTracer)
@@ -100,7 +100,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                     // Check every second
                     await Task.Delay(1000);
 
-                    await UpdatePendingAsync(batchSize, _model.DocsPendingAnalysis, filesUpdatedCallback);
+                    await UpdatePendingAsync(batchSize, _model.DocsPendingAnalysis.Cast<SharePointFileInfo>().ToList(), filesUpdatedCallback);
 
                     // Check again if anything to do
                     filesToGetAnalysisFor = _model.DocsPendingAnalysis.Any();
@@ -109,7 +109,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
                 _model.Finished = DateTime.Now;
                 var ts = _model.Finished.Value.Subtract(_model.Started);
-                Console.WriteLine($"Finished site - done in {ts.TotalMinutes.ToString("N2")} mins");
+                _tracer.TrackTrace($"STAGE 2/2: Finished getting metadata for site files. All done in {ts.TotalMinutes.ToString("N2")} minutes.");
             }
 
             return _model;
@@ -125,7 +125,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             }
         }
 
-        void AddToBackgroundDocQueue(List<DocumentSiteFile> documentSiteFiles)
+        void AddToBackgroundDocQueue(List<SharePointFileInfo> documentSiteFiles)
         {
             lock (_outstandingFilesBuffer)
             {
@@ -140,11 +140,11 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             while (_processBackgroundDocQueue)
             {
                 var count = 0;
-                var newProcessingChunk = new List<DocumentSiteFile>();
+                var newProcessingChunk = new List<SharePointFileInfo>();
                 lock (_outstandingFilesBuffer)
                 {
                     count = _outstandingFilesBuffer.Count > batchSize ? batchSize : _outstandingFilesBuffer.Count;
-                    newProcessingChunk = new List<DocumentSiteFile>(_outstandingFilesBuffer.Take(count));
+                    newProcessingChunk = new List<SharePointFileInfo>(_outstandingFilesBuffer.Take(count));
                 }
 
                 if (count > 0)
@@ -180,7 +180,10 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             {
                 lock (this)
                 {
-                    Console.WriteLine($"{_model.DocsPendingAnalysis.Count}/{_model.AllFiles.Count} files pending metadata: {_httpClient.CompletedCalls} calls completed; {_httpClient.ThrottledCalls} throttled; {_httpClient.ConcurrentCalls} currently active");
+                    if (_model.AllFiles.Count > 0)
+                        Console.WriteLine($"{_model.DocsPendingAnalysis.Count}/{_model.AllFiles.Count} files pending metadata: " +
+                            $"{_httpClient.CompletedCalls} calls completed; {_httpClient.ThrottledCalls} throttled (total); {_httpClient.ConcurrentCalls} currently active");
+
                 }
                 await Task.Delay(5000);
             }
@@ -188,21 +191,24 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
         #endregion
 
-        async Task UpdatePendingAsync(int batchSize, List<DocumentSiteFile> filesToUpdate, Action<List<SharePointFileInfo>>? filesUpdatedCallback)
+        async Task UpdatePendingAsync(int batchSize, List<SharePointFileInfo> filesToUpdate, Action<List<SharePointFileInfo>>? filesUpdatedCallback)
         {
             var backgroundMetaTasksThisChunk = new List<Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>>>();
 
             // Begin background loading of extra metadata
-            _tracer.TrackTrace($"START: Analysing {filesToUpdate.Count.ToString("N0")} files for last-usage...");
-
             var pendingFilesToAnalyse = new List<DocumentSiteFile>();
 
             foreach (var fileToUpdate in filesToUpdate)
             {
-                // Avoid analysing more than once
-                fileToUpdate.State = SiteFileAnalysisState.AnalysisInProgress;
+                // We only get stats for docs, not attachments
+                if (fileToUpdate is DocumentSiteFile)
+                {
+                    var docToUpdate = (DocumentSiteFile)fileToUpdate;
 
-                pendingFilesToAnalyse.Add(fileToUpdate);
+                    // Avoid analysing more than once
+                    docToUpdate.State = SiteFileAnalysisState.AnalysisInProgress;
+                    pendingFilesToAnalyse.Add(docToUpdate);
+                }
 
                 // Start new background every $CHUNK_SIZE
                 if (pendingFilesToAnalyse.Count >= batchSize)
@@ -291,7 +297,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 _fileFoundBuffer.Clear();
 
                 // Start background refresh of new files
-                AddToBackgroundDocQueue(bufferCopy.Cast<DocumentSiteFile>().ToList());
+                AddToBackgroundDocQueue(bufferCopy.Cast<SharePointFileInfo>().ToList());
             }
 
             return Task.CompletedTask;

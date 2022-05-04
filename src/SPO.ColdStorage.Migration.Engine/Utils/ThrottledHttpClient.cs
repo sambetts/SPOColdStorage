@@ -137,7 +137,7 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
 
                         // We've not reached throttling max retries...keep retrying
                         debugTracer.TrackTrace($"{Constants.THROTTLE_ERROR} downloading from REST. Waiting {retries} seconds to try again...",
-                            Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Information);
+                            Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Verbose);
 
                         secondsToWait = retries * 2;
                     }

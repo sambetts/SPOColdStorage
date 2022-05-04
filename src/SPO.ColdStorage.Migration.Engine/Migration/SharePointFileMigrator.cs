@@ -143,7 +143,7 @@ namespace SPO.ColdStorage.Migration.Engine.Migration
 
             await _db.SaveChangesAsync();
         }
-        async Task<Entities.DBEntities.File> GetDbFileForFileInfo(SharePointFileInfo fileMigrated)
+        async Task<Entities.DBEntities.SPFile> GetDbFileForFileInfo(SharePointFileInfo fileMigrated)
         {
             // Find/create web & site
             var fileSite = await _db.Sites
@@ -172,7 +172,7 @@ namespace SPO.ColdStorage.Migration.Engine.Migration
             var migratedFileRecord = await _db.Files.Where(f => f.Url.ToLower() == fileMigrated.FullSharePointUrl.ToLower()).FirstOrDefaultAsync();
             if (migratedFileRecord == null)
             {
-                migratedFileRecord = new Entities.DBEntities.File
+                migratedFileRecord = new Entities.DBEntities.SPFile
                 {
                     Url = fileMigrated.FullSharePointUrl.ToLower(),
                     Web = fileWeb
