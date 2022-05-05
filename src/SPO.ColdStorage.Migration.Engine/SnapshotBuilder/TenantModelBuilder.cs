@@ -9,6 +9,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
     public class TenantModelBuilder : BaseComponent
     {
         private List<Task> _updateTasks = new();
+        private StagingFilesMigrator stagingFilesMigrator = new();
         public TenantModelBuilder(Config config, DebugTracer debugTracer) : base(config, debugTracer)
         {
         }
@@ -17,6 +18,10 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         {
             using (var db = new SPOColdStorageDbContext(this._config))
             {
+                // Clean staging 1st
+                await stagingFilesMigrator.CleanStagingAll(db);
+
+                // Start analysis
                 var tenantModel = new SiteSnapshot();
                 var siteTasks = new List<Task<SiteSnapshotModel>>();
                 var sitesToAnalyse = await db.TargetSharePointSites.ToListAsync();
@@ -49,29 +54,49 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         }
         async Task InsertFilesAsync(List<SharePointFileInfoWithList> insertedFiles)
         {
-            int inserted = 0;
-            Console.WriteLine("START INSERT FILES");
             using (var db = new SPOColdStorageDbContext(this._config))
             {
-                var files = new List<StagingTempFile>();
-                foreach (var insertedFile in insertedFiles)
-                {
-                    var f = new StagingTempFile(insertedFile);
-                    files.Add(f);
-                }
-                await db.StagingFiles.AddRangeAsync(files);
-                await db.SaveChangesAsync();
-                _tracer.TrackTrace($"END INSERT: Inserted {inserted} new files.");
+                var executionStrategy = db.Database.CreateExecutionStrategy();
+                await executionStrategy.Execute(async () =>
+           {
+               using (var trans = await db.Database.BeginTransactionAsync())
+               {
+                   var blockGuid = Guid.NewGuid();
+                   var inserted = DateTime.Now;
+
+                   // Insert staging data
+                   var files = new List<StagingTempFile>();
+                   foreach (var insertedFile in insertedFiles)
+                   {
+                       var f = new StagingTempFile(insertedFile, blockGuid, inserted);
+                       files.Add(f);
+                   }
+                   await db.StagingFiles.AddRangeAsync(files);
+                   await db.SaveChangesAsync();
+
+                   // Merge from staging to tables
+                   var inserts = await stagingFilesMigrator.MigrateBlockAndCleanFromStaging(db, blockGuid);
+
+                   if (inserts > 0)
+                   {
+                       Console.WriteLine($"Inserted {inserts} new files");
+                   }
+
+                   await trans.CommitAsync();
+               }
+           });
+
+
             }
         }
-        Task UpdateFiles(List<SharePointFileInfoWithList> updatedFiles)
+        Task UpdateFiles(List<DocumentSiteFile> updatedFiles)
         {
             _updateTasks.Add(Task.Run(async () =>
             {
                 int updated = 0, inserted = 0;
                 using (var db = new SPOColdStorageDbContext(this._config))
                 {
-                    _tracer.TrackTrace($"Updating {updatedFiles.Count} to DB");
+                    _tracer.TrackTrace($"Updating {updatedFiles.Count} files to DB from downloaded metadata");
                     foreach (var updatedFile in updatedFiles)
                     {
                         var r = await UpdateStats(updatedFile, db);
@@ -85,27 +110,27 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             }));
             return Task.CompletedTask;
         }
-        
 
-        async Task<StatsSaveResult> UpdateStats(BaseSharePointFileInfo updatedFile, SPOColdStorageDbContext db)
+
+        async Task<StatsSaveResult> UpdateStats(DocumentSiteFile updatedFile, SPOColdStorageDbContext db)
         {
-            var existingFile = await db.Files.Where(f => f.Url == updatedFile.FullSharePointUrl).SingleOrDefaultAsync();
+            var results = StatsSaveResult.New;
+            var existingFile = await db.Files.Where(f => f.Url == updatedFile.ServerRelativeFilePath).SingleOrDefaultAsync();
             if (existingFile == null)
             {
                 _tracer.TrackTrace($"Got update for a file that we haven't inserted yet...", Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Warning);
                 existingFile = await updatedFile.GetDbFileForFileInfo(db);
             }
-            var stats = await db.FileStats.Where(s => s.File == existingFile).SingleOrDefaultAsync();
-            if (stats == null)
+            if (existingFile.StatsUpdated.HasValue)
             {
-                stats = new FileStats();
-                db.FileStats.Add(stats);
-                return StatsSaveResult.New;
+                results = StatsSaveResult.Updated;
             }
-            else
-            {
-                return StatsSaveResult.Updated;
-            }
+
+            // Set stats
+            existingFile.StatsUpdated = DateTime.Now;
+            existingFile.AccessCount = updatedFile.AccessCount;
+
+            return results;
         }
 
         enum StatsSaveResult

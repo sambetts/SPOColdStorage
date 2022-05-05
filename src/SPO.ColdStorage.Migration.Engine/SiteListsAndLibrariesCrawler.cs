@@ -13,16 +13,19 @@ namespace SPO.ColdStorage.Migration.Engine
 
         private readonly ClientContext _spClient;
         private readonly DebugTracer _tracer;
+
+        private readonly Action? crawlComplete;
         public event Func<SharePointFileInfoWithList, Task>? _foundFileToMigrateCallback;
 
-        public SiteListsAndLibrariesCrawler(ClientContext clientContext, DebugTracer tracer) : this(clientContext, tracer, null)
+        public SiteListsAndLibrariesCrawler(ClientContext clientContext, DebugTracer tracer) : this(clientContext, tracer, null, null)
         {
         }
 
-        public SiteListsAndLibrariesCrawler(ClientContext clientContext, DebugTracer tracer, Func<SharePointFileInfoWithList, Task>? foundFileToMigrateCallback)
+        public SiteListsAndLibrariesCrawler(ClientContext clientContext, DebugTracer tracer, Func<SharePointFileInfoWithList, Task>? foundFileToMigrateCallback, Action? crawlComplete)
         {
             this._spClient = clientContext;
             this._tracer = tracer;
+            this.crawlComplete = crawlComplete;
             this._foundFileToMigrateCallback = foundFileToMigrateCallback;
         }
 
@@ -41,6 +44,7 @@ namespace SPO.ColdStorage.Migration.Engine
             {
                 await ProcessWeb(subSweb, siteFolderConfig);
             }
+            crawlComplete?.Invoke();
         }
 
         private async Task ProcessWeb(Web web, SiteListFilterConfig siteFolderConfig)
@@ -118,9 +122,9 @@ namespace SPO.ColdStorage.Migration.Engine
                                 );
 
                     // Set drive ID when 1st results come back
-                    listModel = new DocLib() 
-                    { 
-                        Title = list.Title, 
+                    listModel = new DocLib()
+                    {
+                        Title = list.Title,
                         ServerRelativeUrl = list.RootFolder.ServerRelativeUrl
                     };
                 }

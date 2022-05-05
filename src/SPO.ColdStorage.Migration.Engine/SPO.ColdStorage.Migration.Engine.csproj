@@ -7,6 +7,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="SQL\MergeStagingFiles.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="SQL\MergeStagingFiles.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Azure.Identity" Version="1.5.0" />
     <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.5.1" />
     <PackageReference Include="Azure.Search.Documents" Version="11.3.0" />

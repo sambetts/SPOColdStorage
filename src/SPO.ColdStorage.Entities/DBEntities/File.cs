@@ -21,39 +21,39 @@ namespace SPO.ColdStorage.Entities.DBEntities
 
         public Web Web { get; set; } = null!;
 
-        [Column("last_modified")]
-        public DateTime LastModified { get; set; } = DateTime.MinValue;
-
-        [Column("last_modified_by")]
-        public string LastModifiedBy { get; set; } = string.Empty;
-    }
-
-    [Table("file_stats")]
-    public class FileStats: BaseDBObject
-    {
-        [ForeignKey(nameof(File))]
-        [Column("file_id")]
-        public int FileId { get; set; }
-
-        public SPFile File { get; set; } = new SPFile();
 
         [Column("access_count")]
         public int? AccessCount { get; set; } = null;
 
-        [Column("updated")]
-        public DateTime Updated { get; set; }
+        [Column("stats_updated")]
+        public DateTime? StatsUpdated { get; set; }
+
+
+        [Column("last_modified")]
+        public DateTime LastModified { get; set; } = DateTime.MinValue;
+
+        public User LastModifiedBy { get; set; } = new User();
+
+        [ForeignKey(nameof(LastModifiedBy))]
+        [Column("last_modified_by_user_id")]
+        public int LastModifiedByUserId { get; set; }
     }
 
 
     public class StagingTempFile : BaseSharePointFileInfo
     {
         public StagingTempFile() { }
-        public StagingTempFile(BaseSharePointFileInfo driveArg) : base(driveArg)
+        public StagingTempFile(BaseSharePointFileInfo driveArg, Guid blockGuid, DateTime inserted) : base(driveArg)
         {
+            this.ImportBlockId = blockGuid;
+            this.Inserted = inserted;
         }
 
         [Key]
         [Column("id")]
         public int ID { get; set; }
+
+        public Guid ImportBlockId { get; set; } = Guid.Empty;
+        public DateTime Inserted { get; set; } = DateTime.Now;
     }
 }

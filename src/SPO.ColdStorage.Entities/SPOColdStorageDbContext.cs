@@ -30,8 +30,8 @@ namespace SPO.ColdStorage.Entities
         public DbSet<Site> Sites { get; set; } = null!;
         public DbSet<Web> Webs { get; set; } = null!;
         public DbSet<SPFile> Files { get; set; } = null!;
+        public DbSet<User> Users { get; set; } = null!;
         public DbSet<StagingTempFile> StagingFiles { get; set; } = null!;
-        public DbSet<FileStats> FileStats { get; set; } = null!;
         public DbSet<FileMigrationErrorLog> FileMigrationErrors { get; set; } = null!;
         public DbSet<FileMigrationCompletedLog> FileMigrationsCompleted { get; set; } = null!;
         protected override void OnModelCreating(ModelBuilder builder)

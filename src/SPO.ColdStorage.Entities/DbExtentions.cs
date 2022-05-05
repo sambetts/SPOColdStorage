@@ -37,6 +37,13 @@ namespace SPO.ColdStorage.Entities
                 db.Webs.Append(fileWeb);
             }
 
+            var author = await db.Users.Where(u => u.Email.ToLower() == fileMigrated.Author.ToLower()).SingleOrDefaultAsync();
+            if (author == null)
+            {
+                author = new User { Email = fileMigrated.Author.ToLower() };
+                db.Users.Append(author);
+            }
+
             // Find/create file
             var migratedFileRecord = await db.Files.Where(f => f.Url.ToLower() == fileMigrated.FullSharePointUrl.ToLower()).FirstOrDefaultAsync();
             if (migratedFileRecord == null)
@@ -49,7 +56,7 @@ namespace SPO.ColdStorage.Entities
                 db.Files.Append(migratedFileRecord);
             }
             migratedFileRecord.LastModified = fileMigrated.LastModified;
-            migratedFileRecord.LastModifiedBy = fileMigrated.Author;
+            migratedFileRecord.LastModifiedBy = author;
 
             return migratedFileRecord;
         }
