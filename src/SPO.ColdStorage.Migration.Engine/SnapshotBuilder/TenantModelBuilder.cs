@@ -8,7 +8,6 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 {
     public class TenantModelBuilder : BaseComponent
     {
-        private List<Task> _insertTasks = new();
         private List<Task> _updateTasks = new();
         public TenantModelBuilder(Config config, DebugTracer debugTracer) : base(config, debugTracer)
         {
@@ -43,12 +42,29 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         {
             var s = new SiteModelBuilder(base._config, base._tracer, site);
 
-            return await s.Build(100, 
-                async filesDiscovered => await InsertFiles(filesDiscovered), 
-                async updatedFiles => await UpdateFiles(updatedFiles) 
+            return await s.Build(100,
+                async filesDiscovered => await InsertFiles(filesDiscovered),
+                async updatedFiles => await UpdateFiles(updatedFiles)
             );
         }
-
+        async Task InsertFiles(List<SharePointFileInfo> insertedFiles)
+        {
+            int inserted = 0;
+            Console.WriteLine("START INSERT FILES");
+            using (var db = new SPOColdStorageDbContext(this._config))
+            {
+                foreach (var insertedFile in insertedFiles)
+                {
+                    var f = await EnsureFileExists(insertedFile, db);
+                    if (f.IsUnsaved)
+                    {
+                        inserted++;
+                    }
+                }
+                await db.SaveChangesAsync();
+                _tracer.TrackTrace($"END INSERT: Inserted {inserted} new files.");
+            }
+        }
         Task UpdateFiles(List<SharePointFileInfo> updatedFiles)
         {
             _updateTasks.Add(Task.Run(async () =>
@@ -70,28 +86,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             }));
             return Task.CompletedTask;
         }
-        Task InsertFiles(List<SharePointFileInfo> insertedFiles)
-        {
-            _insertTasks.Add(Task.Run(async () =>
-            {
-                int inserted = 0;
-                using (var db = new SPOColdStorageDbContext(this._config))
-                {
-                    _tracer.TrackTrace($"Inserting {insertedFiles.Count} to DB");
-                    foreach (var insertedFile in insertedFiles)
-                    {
-                        var f = await EnsureFileExists(insertedFile, db);
-                        if (f.IsUnsaved)
-                        {
-                            inserted++;
-                        }
-                    }
-                    await db.SaveChangesAsync();
-                    _tracer.TrackTrace($"Inserted {inserted} new files.");
-                }
-            }));
-            return Task.CompletedTask;
-        }
+        
 
         async Task<StatsSaveResult> UpdateStats(SharePointFileInfo updatedFile, SPOColdStorageDbContext db)
         {
@@ -101,7 +96,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 _tracer.TrackTrace($"Got update for a file that we haven't inserted yet...", Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Warning);
                 existingFile = await EnsureFileExists(updatedFile, db);
             }
-            var stats = await db.FileStats.Where(s=> s.File == existingFile).SingleOrDefaultAsync();
+            var stats = await db.FileStats.Where(s => s.File == existingFile).SingleOrDefaultAsync();
             if (stats == null)
             {
                 stats = new FileStats();

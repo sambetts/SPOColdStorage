@@ -226,6 +226,10 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             {
                 backgroundMetaTasksThisChunk.Add(pendingFilesToAnalyse.GetDriveItemsAnalytics(_site.RootURL, _httpClient, _tracer));
             }
+            else
+            {
+                return;
+            }
 
             // Update global tasks
             lock (this)
@@ -292,7 +296,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 var bufferCopy = new List<SharePointFileInfo>(_fileFoundBuffer);
                 if (newFilesCallback != null)
                 {
-                    newFilesCallback(bufferCopy);
+                    newFilesCallback.Invoke(bufferCopy);
                 }
                 _fileFoundBuffer.Clear();
 
