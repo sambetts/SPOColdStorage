@@ -22,8 +22,6 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 await stagingFilesMigrator.CleanStagingAll(db);
 
                 // Start analysis
-                var tenantModel = new SiteSnapshot();
-                var siteTasks = new List<Task<SiteSnapshotModel>>();
                 var sitesToAnalyse = await db.TargetSharePointSites.ToListAsync();
 
                 if (sitesToAnalyse.Count == 0)
@@ -35,11 +33,8 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 foreach (var s in sitesToAnalyse)
                 {
                     _tracer.TrackTrace($"--{s.RootURL}");
-                    siteTasks.Add(StartSiteAnalysisAsync(s));
+                    await StartSiteAnalysisAsync(s);
                 }
-
-                await Task.WhenAll(siteTasks);
-                tenantModel.SiteSnapshots.AddRange(siteTasks.Select(s => s.Result));
             }
         }
 
@@ -75,12 +70,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                    await db.SaveChangesAsync();
 
                    // Merge from staging to tables
-                   var inserts = await stagingFilesMigrator.MigrateBlockAndCleanFromStaging(db, blockGuid);
-
-                   if (inserts > 0)
-                   {
-                       Console.WriteLine($"Inserted {inserts} new files");
-                   }
+                   var inserts = stagingFilesMigrator.MigrateBlockAndCleanFromStaging(db, blockGuid);
 
                    await trans.CommitAsync();
                }
@@ -103,8 +93,6 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                         if (r == StatsSaveResult.New) inserted++;
                         else if (r == StatsSaveResult.Updated) updated++;
                     }
-
-                    _tracer.TrackTrace($"Inserted {inserted} stats and updated {updated}");
                     await db.SaveChangesAsync();
                 }
             }));

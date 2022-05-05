@@ -32,4 +32,3 @@ await analyser.Build();
 
 
 Console.WriteLine("\nAll sites scanned. Finished building snapshot.");
-Console.ReadLine();

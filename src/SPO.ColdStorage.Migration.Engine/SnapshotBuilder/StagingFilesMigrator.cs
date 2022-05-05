@@ -14,7 +14,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         /// <summary>
         /// Migrate from staging to real tables a specific block. Staging cleaned after migrate.
         /// </summary>
-        public async Task<int> MigrateBlockAndCleanFromStaging(SPOColdStorageDbContext context, Guid blockGuid)
+        public int MigrateBlockAndCleanFromStaging(SPOColdStorageDbContext context, Guid blockGuid)
         {
             lock (this)
             {
@@ -22,12 +22,12 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 {
                     _sqlTemplate = ReadResource("SPO.ColdStorage.Migration.Engine.SQL.MergeStagingFiles.sql");
                 }
+                var blockSql = _sqlTemplate.Replace("--[blockset]--", $"SET @blockGuid='{blockGuid}';");
+                var rowsAffected = context.Database.ExecuteSqlRaw(blockSql);
+
+                return rowsAffected;
             }
 
-            var blockSql = _sqlTemplate.Replace("--[blockset]--", $"SET @blockGuid='{blockGuid}';");
-            var inserts = await context.Database.ExecuteSqlRawAsync(blockSql);
-
-            return inserts;
         }
 
         public async Task CleanStagingAll(SPOColdStorageDbContext context)

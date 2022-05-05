@@ -2,11 +2,6 @@
 
 namespace SPO.ColdStorage.Models
 {
-    public class SiteSnapshot
-    {
-        public List<SiteSnapshotModel> SiteSnapshots { get; set; } = new List<SiteSnapshotModel>();
-    }
-
     /// <summary>
     /// Snapshot of files in a site.
     /// </summary>

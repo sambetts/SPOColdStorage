@@ -238,33 +238,35 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 _backgroundMetaTasks.AddRange(backgroundMetaTasksThisChunk);
             }
 
-            await Task.WhenAll(backgroundMetaTasksThisChunk);
-
-            // Compile results
-            var updates = new Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse.AnalyticsItemActionStat>();
-            foreach (var backgroundTask in backgroundMetaTasksThisChunk)
+            while (backgroundMetaTasksThisChunk.Count > 0)
             {
-                foreach (var stat in backgroundTask.Result)
+                var finished = await Task.WhenAny(backgroundMetaTasksThisChunk);
+
+                // Compile results
+                var updates = new Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse.AnalyticsItemActionStat>();
+
+                foreach (var stat in finished.Result)
                 {
                     if (stat.Value.AccessStats != null)
                     {
                         updates.Add(stat.Key, stat.Value.AccessStats);
                     }
                 }
-            }
 
-            // Update model & fire event
-            var updatedFiles = new List<DocumentSiteFile>();
-            foreach (var fileUpdated in updates)
-            {
-                lock (this)
+                // Update model & fire event
+                var updatedFiles = new List<DocumentSiteFile>();
+                foreach (var fileUpdated in updates)
                 {
-                    // Update model
-                    updatedFiles.Add(_model.UpdateDocItem(fileUpdated.Key, fileUpdated.Value));
+                    lock (this)
+                    {
+                        // Update model
+                        updatedFiles.Add(_model.UpdateDocItem(fileUpdated.Key, fileUpdated.Value));
+                    }
                 }
-            }
 
-            filesUpdatedCallback?.Invoke(updatedFiles);
+                filesUpdatedCallback?.Invoke(updatedFiles);
+                backgroundMetaTasksThisChunk.Remove(finished);
+            }
         }
 
         private void CrawlComplete(Action<List<SharePointFileInfoWithList>>? newFilesCallback)
