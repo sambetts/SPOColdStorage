@@ -13,13 +13,13 @@ namespace SPO.ColdStorage.Migration.Engine
 
         private readonly ClientContext _spClient;
         private readonly DebugTracer _tracer;
-        public event Func<SharePointFileInfo, Task>? _foundFileToMigrateCallback;
+        public event Func<SharePointFileInfoWithList, Task>? _foundFileToMigrateCallback;
 
         public SiteListsAndLibrariesCrawler(ClientContext clientContext, DebugTracer tracer) : this(clientContext, tracer, null)
         {
         }
 
-        public SiteListsAndLibrariesCrawler(ClientContext clientContext, DebugTracer tracer, Func<SharePointFileInfo, Task>? foundFileToMigrateCallback)
+        public SiteListsAndLibrariesCrawler(ClientContext clientContext, DebugTracer tracer, Func<SharePointFileInfoWithList, Task>? foundFileToMigrateCallback)
         {
             this._spClient = clientContext;
             this._tracer = tracer;
@@ -74,18 +74,18 @@ namespace SPO.ColdStorage.Migration.Engine
                 }
             }
         }
-        public async Task<List<SharePointFileInfo>> CrawlList(List list)
+        public async Task<List<BaseSharePointFileInfo>> CrawlList(List list)
         {
             return await CrawlList(list, new ListFolderConfig());
         }
-        public async Task<List<SharePointFileInfo>> CrawlList(List list, ListFolderConfig listFolderConfig)
+        public async Task<List<BaseSharePointFileInfo>> CrawlList(List list, ListFolderConfig listFolderConfig)
         {
             await EnsureContextWebIsLoaded();
             _spClient.Load(list, l => l.BaseType, l => l.ItemCount, l => l.RootFolder);
             await _spClient.ExecuteQueryAsyncWithThrottleRetries(_tracer);
 
             SiteList? listModel = null;
-            var results = new List<SharePointFileInfo>();
+            var results = new List<BaseSharePointFileInfo>();
 
             var camlQuery = new CamlQuery();
             camlQuery.ViewXml = "<View Scope=\"RecursiveAll\"><Query>" +
@@ -153,7 +153,7 @@ namespace SPO.ColdStorage.Migration.Engine
                 currentPosition = listItems.ListItemCollectionPosition;
                 foreach (var item in listItems)
                 {
-                    SharePointFileInfo? foundFileInfo = null;
+                    BaseSharePointFileInfo? foundFileInfo = null;
                     if (list.BaseType == BaseType.GenericList)
                     {
                         results.AddRange(await ProcessListItemAttachments(item, listModel, listFolderConfig));
@@ -181,7 +181,7 @@ namespace SPO.ColdStorage.Migration.Engine
         /// <summary>
         /// Process a single document library item.
         /// </summary>
-        private async Task<SharePointFileInfo?> ProcessDocLibItem(ListItem docListItem, SiteList listModel, ListFolderConfig listFolderConfig)
+        private async Task<BaseSharePointFileInfo?> ProcessDocLibItem(ListItem docListItem, SiteList listModel, ListFolderConfig listFolderConfig)
         {
             if (docListItem.FileSystemObjectType == FileSystemObjectType.File && docListItem.File.Exists)
             {
@@ -210,9 +210,9 @@ namespace SPO.ColdStorage.Migration.Engine
         /// <summary>
         /// Process custom list item with possibly multiple attachments
         /// </summary>
-        private async Task<List<SharePointFileInfo>> ProcessListItemAttachments(ListItem item, SiteList listModel, ListFolderConfig listFolderConfig)
+        private async Task<List<BaseSharePointFileInfo>> ProcessListItemAttachments(ListItem item, SiteList listModel, ListFolderConfig listFolderConfig)
         {
-            var attachmentsResults = new List<SharePointFileInfo>();
+            var attachmentsResults = new List<BaseSharePointFileInfo>();
 
             foreach (var attachment in item.AttachmentFiles)
             {
@@ -260,7 +260,7 @@ namespace SPO.ColdStorage.Migration.Engine
             }
         }
 
-        SharePointFileInfo GetSharePointFileInfo(ListItem item, string url, SiteList listModel)
+        SharePointFileInfoWithList GetSharePointFileInfo(ListItem item, string url, SiteList listModel)
         {
             var dir = "";
             if (item.FieldValues.ContainsKey("FileDirRef"))
@@ -291,7 +291,7 @@ namespace SPO.ColdStorage.Migration.Engine
                     if (!isGraphDriveItem)
                     {
                         // No Graph IDs - probably a list item
-                        return new SharePointFileInfo
+                        return new SharePointFileInfoWithList
                         {
                             Author = author,
                             ServerRelativeFilePath = url,

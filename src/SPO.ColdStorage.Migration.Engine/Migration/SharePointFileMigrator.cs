@@ -30,7 +30,7 @@ namespace SPO.ColdStorage.Migration.Engine.Migration
         /// <summary>
         /// Queue file for migrator to pick-up & migrate
         /// </summary>
-        public async Task QueueSharePointFileMigrationIfNeeded(SharePointFileInfo sharePointFileInfo, BlobContainerClient containerClient)
+        public async Task QueueSharePointFileMigrationIfNeeded(BaseSharePointFileInfo sharePointFileInfo, BlobContainerClient containerClient)
         {
             bool needsMigrating = await DoesSharePointFileNeedMigrating(sharePointFileInfo, containerClient);
             if (needsMigrating)
@@ -45,7 +45,7 @@ namespace SPO.ColdStorage.Migration.Engine.Migration
         /// <summary>
         /// Checks if a given file in SharePoint exists in blob & has the latest version
         /// </summary>
-        public async Task<bool> DoesSharePointFileNeedMigrating(SharePointFileInfo sharePointFileInfo, BlobContainerClient containerClient)
+        public async Task<bool> DoesSharePointFileNeedMigrating(BaseSharePointFileInfo sharePointFileInfo, BlobContainerClient containerClient)
         {
             // Check if blob exists in account
             var fileRef = containerClient.GetBlobClient(sharePointFileInfo.ServerRelativeFilePath);
@@ -70,7 +70,7 @@ namespace SPO.ColdStorage.Migration.Engine.Migration
         /// <summary>
         /// Download from SP and upload to blob-storage
         /// </summary>
-        public async Task<long> MigrateFromSharePointToBlobStorage(SharePointFileInfo fileToMigrate, IConfidentialClientApplication app)
+        public async Task<long> MigrateFromSharePointToBlobStorage(BaseSharePointFileInfo fileToMigrate, IConfidentialClientApplication app)
         {
             // Download from SP to local
             var downloader = new SharePointFileDownloader(app, _config, _tracer);
@@ -109,9 +109,9 @@ namespace SPO.ColdStorage.Migration.Engine.Migration
             return tempFileNameAndSize.Item2;
         }
 
-        public async Task SaveSucessfulFileMigrationToSql(SharePointFileInfo fileMigrated)
+        public async Task SaveSucessfulFileMigrationToSql(BaseSharePointFileInfo fileMigrated)
         {
-            var migratedFile = await GetDbFileForFileInfo(fileMigrated);
+            var migratedFile = await fileMigrated.GetDbFileForFileInfo(_db);
 
             // Update file last modified
             migratedFile.LastModified = fileMigrated.LastModified;
@@ -127,9 +127,9 @@ namespace SPO.ColdStorage.Migration.Engine.Migration
             await _db.SaveChangesAsync();
         }
 
-        public async Task SaveErrorForFileMigrationToSql(Exception ex, SharePointFileInfo fileNotMigrated)
+        public async Task SaveErrorForFileMigrationToSql(Exception ex, BaseSharePointFileInfo fileNotMigrated)
         {
-            var errorFile = await GetDbFileForFileInfo(fileNotMigrated);
+            var errorFile = await fileNotMigrated.GetDbFileForFileInfo(_db);
 
             // Add log
             var log = await _db.FileMigrationErrors.Where(l => l.File == errorFile).SingleOrDefaultAsync();
@@ -143,48 +143,6 @@ namespace SPO.ColdStorage.Migration.Engine.Migration
 
             await _db.SaveChangesAsync();
         }
-        async Task<Entities.DBEntities.SPFile> GetDbFileForFileInfo(SharePointFileInfo fileMigrated)
-        {
-            // Find/create web & site
-            var fileSite = await _db.Sites
-                .Where(f => f.Url.ToLower() == fileMigrated.SiteUrl.ToLower()).FirstOrDefaultAsync();
-            if (fileSite == null)
-            {
-                fileSite = new Entities.DBEntities.Site
-                {
-                    Url = fileMigrated.SiteUrl.ToLower()
-                };
-                _db.Sites.Append(fileSite);
-            }
-
-            var fileWeb = await _db.Webs.Where(f => f.Url.ToLower() == fileMigrated.WebUrl.ToLower()).FirstOrDefaultAsync();
-            if (fileWeb == null)
-            {
-                fileWeb = new Entities.DBEntities.Web
-                {
-                    Url = fileMigrated.WebUrl.ToLower(),
-                    Site = fileSite
-                };
-                _db.Webs.Append(fileWeb);
-            }
-
-            // Find/create file
-            var migratedFileRecord = await _db.Files.Where(f => f.Url.ToLower() == fileMigrated.FullSharePointUrl.ToLower()).FirstOrDefaultAsync();
-            if (migratedFileRecord == null)
-            {
-                migratedFileRecord = new Entities.DBEntities.SPFile
-                {
-                    Url = fileMigrated.FullSharePointUrl.ToLower(),
-                    Web = fileWeb
-                };
-                _db.Files.Append(migratedFileRecord);
-            }
-            migratedFileRecord.LastModified = fileMigrated.LastModified;
-            migratedFileRecord.LastModifiedBy = fileMigrated.Author;
-
-            return migratedFileRecord;
-        }
-
 
         public void Dispose()
         {

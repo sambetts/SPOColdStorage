@@ -72,7 +72,7 @@ namespace SPO.ColdStorage.Migration.Engine
         async Task MessageHandler(ProcessMessageEventArgs args)
         {
             string body = args.Message.Body.ToString();
-            var msg = System.Text.Json.JsonSerializer.Deserialize<SharePointFileInfo>(body);
+            var msg = System.Text.Json.JsonSerializer.Deserialize<BaseSharePointFileInfo>(body);
             if (msg != null && msg.IsValidInfo)
             {
                 _tracer.TrackTrace($"Started migration for: {msg.ServerRelativeFilePath}");
@@ -106,7 +106,7 @@ namespace SPO.ColdStorage.Migration.Engine
         }
 
 
-        private async Task StartFileMigrationAsync(SharePointFileInfo sharePointFileToMigrate, ProcessMessageEventArgs args)
+        private async Task StartFileMigrationAsync(BaseSharePointFileInfo sharePointFileToMigrate, ProcessMessageEventArgs args)
         {
             string thisFileRef = sharePointFileToMigrate.FullSharePointUrl;
             if (_ignoreDownloads.Contains(thisFileRef))

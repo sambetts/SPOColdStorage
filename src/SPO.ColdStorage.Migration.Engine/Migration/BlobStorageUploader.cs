@@ -18,7 +18,7 @@ namespace SPO.ColdStorage.Migration.Engine.Migration
         }
 
 
-        public async Task UploadFileToAzureBlob(string localTempFileName, SharePointFileInfo msg)
+        public async Task UploadFileToAzureBlob(string localTempFileName, BaseSharePointFileInfo msg)
         {
             // Create the container and return a container client object
             if (_containerClient == null)

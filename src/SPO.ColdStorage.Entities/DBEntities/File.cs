@@ -9,7 +9,7 @@ namespace SPO.ColdStorage.Entities.DBEntities
     public class SPFile : BaseDBObjectWithUrl
     {
         public SPFile() { }
-        public SPFile(SharePointFileInfo fileDiscovered, Web parentWeb) : this()
+        public SPFile(BaseSharePointFileInfo fileDiscovered, Web parentWeb) : this()
         {
             this.Url = fileDiscovered.FullSharePointUrl;
             this.Web = parentWeb;
@@ -42,5 +42,18 @@ namespace SPO.ColdStorage.Entities.DBEntities
 
         [Column("updated")]
         public DateTime Updated { get; set; }
+    }
+
+
+    public class StagingTempFile : BaseSharePointFileInfo
+    {
+        public StagingTempFile() { }
+        public StagingTempFile(BaseSharePointFileInfo driveArg) : base(driveArg)
+        {
+        }
+
+        [Key]
+        [Column("id")]
+        public int ID { get; set; }
     }
 }

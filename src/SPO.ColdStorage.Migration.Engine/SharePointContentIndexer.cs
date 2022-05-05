@@ -81,7 +81,7 @@ namespace SPO.ColdStorage.Migration.Engine
         /// <summary>
         /// Crawler found a relevant file
         /// </summary>
-        private async Task Crawler_SharePointFileFound(SharePointFileInfo foundFileInfo)
+        private async Task Crawler_SharePointFileFound(BaseSharePointFileInfo foundFileInfo)
         {
             await _sharePointFileMigrator.QueueSharePointFileMigrationIfNeeded(foundFileInfo, _containerClient!);
         }

@@ -5,13 +5,12 @@ namespace SPO.ColdStorage.Models
     /// <summary>
     /// SharePoint Online file metadata for base file-type
     /// </summary>
-    public class SharePointFileInfo 
+    public class BaseSharePointFileInfo 
     {
-        public SharePointFileInfo() { }
-        public SharePointFileInfo(SharePointFileInfo driveArg) : this()
+        public BaseSharePointFileInfo() { }
+        public BaseSharePointFileInfo(BaseSharePointFileInfo driveArg) : this()
         {
             this.SiteUrl = driveArg.SiteUrl;
-            this.List = driveArg.List;
             this.WebUrl = driveArg.WebUrl;
             this.ServerRelativeFilePath = driveArg.ServerRelativeFilePath;
             this.Author = driveArg.Author;
@@ -23,11 +22,6 @@ namespace SPO.ColdStorage.Models
         /// Example: https://m365x352268.sharepoint.com/sites/MigrationHost
         /// </summary>
         public string SiteUrl { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Parent list
-        /// </summary>
-        public SiteList List { get; set; } = new SiteList();
 
         /// <summary>
         /// Example: https://m365x352268.sharepoint.com/sites/MigrationHost/subsite
@@ -114,9 +108,23 @@ namespace SPO.ColdStorage.Models
         }
     }
 
-    public class DriveItemSharePointFileInfo : SharePointFileInfo
+    public class SharePointFileInfoWithList : BaseSharePointFileInfo
     {
-        public DriveItemSharePointFileInfo() { }
+        public SharePointFileInfoWithList() { }
+        public SharePointFileInfoWithList(DriveItemSharePointFileInfo driveArg) : base(driveArg)
+        {
+            this.List = driveArg.List;
+        }
+
+        /// <summary>
+        /// Parent list
+        /// </summary>
+        public SiteList List { get; set; } = new SiteList();
+    }
+
+    public class DriveItemSharePointFileInfo : SharePointFileInfoWithList
+    {
+        public DriveItemSharePointFileInfo() :base() { }
         public DriveItemSharePointFileInfo(DriveItemSharePointFileInfo driveArg) : base(driveArg)
         {
             this.DriveId = driveArg.DriveId;

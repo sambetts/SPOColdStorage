@@ -32,8 +32,8 @@ namespace SPO.ColdStorage.Models
             } 
         }
 
-        List<SharePointFileInfo>? _allFilesCache = null;
-        public List<SharePointFileInfo> AllFiles 
+        List<BaseSharePointFileInfo>? _allFilesCache = null;
+        public List<BaseSharePointFileInfo> AllFiles 
         {
             get 
             {
@@ -118,7 +118,7 @@ namespace SPO.ColdStorage.Models
             }
         }
 
-        public void AddFile(SharePointFileInfo newFile, SiteList list)
+        public void AddFile(BaseSharePointFileInfo newFile, SiteList list)
         {
             lock (this)
             {

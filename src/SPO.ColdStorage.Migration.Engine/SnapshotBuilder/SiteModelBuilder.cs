@@ -22,8 +22,8 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
         private bool _processBackgroundDocQueue = false;
         private bool _showStats = false;
-        private List<SharePointFileInfo> _outstandingFilesBuffer = new();
-        private List<SharePointFileInfo> _fileFoundBuffer = new();
+        private List<SharePointFileInfoWithList> _outstandingFilesBuffer = new();
+        private List<SharePointFileInfoWithList> _fileFoundBuffer = new();
         private List<Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>>> _backgroundMetaTasks = new();
         public SiteModelBuilder(Config config, DebugTracer debugTracer, TargetMigrationSite site) : base(config, debugTracer)
         {
@@ -65,7 +65,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         {
             return await Build(100, null, null);
         }
-        public async Task<SiteSnapshotModel> Build(int batchSize, Action<List<SharePointFileInfo>>? newFilesCallback, Action<List<SharePointFileInfo>>? filesUpdatedCallback)
+        public async Task<SiteSnapshotModel> Build(int batchSize, Action<List<SharePointFileInfoWithList>>? newFilesCallback, Action<List<SharePointFileInfoWithList>>? filesUpdatedCallback)
         {
             if (batchSize < 1)
             {
@@ -77,7 +77,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 var ctx = await AuthUtils.GetClientContext(_config, _site.RootURL, _tracer);
 
                 var crawler = new SiteListsAndLibrariesCrawler(ctx, _tracer,
-                    (SharePointFileInfo foundFile) => Crawler_SharePointFileFound(foundFile, batchSize, newFilesCallback));
+                    (SharePointFileInfoWithList foundFile) => Crawler_SharePointFileFound(foundFile, batchSize, newFilesCallback));
 
                 // Begin and block until all files crawled
                 _model.Started = DateTime.Now;
@@ -100,7 +100,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                     // Check every second
                     await Task.Delay(1000);
 
-                    await UpdatePendingAsync(batchSize, _model.DocsPendingAnalysis.Cast<SharePointFileInfo>().ToList(), filesUpdatedCallback);
+                    await UpdatePendingAsync(batchSize, _model.DocsPendingAnalysis.Cast<SharePointFileInfoWithList>().ToList(), filesUpdatedCallback);
 
                     // Check again if anything to do
                     filesToGetAnalysisFor = _model.DocsPendingAnalysis.Any();
@@ -125,7 +125,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             }
         }
 
-        void AddToBackgroundDocQueue(List<SharePointFileInfo> documentSiteFiles)
+        void AddToBackgroundDocQueue(List<SharePointFileInfoWithList> documentSiteFiles)
         {
             lock (_outstandingFilesBuffer)
             {
@@ -133,18 +133,18 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             }
         }
 
-        async Task StartBackgroundDocQueue(int batchSize, Action<List<SharePointFileInfo>>? filesUpdatedCallback)
+        async Task StartBackgroundDocQueue(int batchSize, Action<List<SharePointFileInfoWithList>>? filesUpdatedCallback)
         {
             Console.WriteLine("Starting background doc queue");
             _processBackgroundDocQueue = true;
             while (_processBackgroundDocQueue)
             {
                 var count = 0;
-                var newProcessingChunk = new List<SharePointFileInfo>();
+                var newProcessingChunk = new List<SharePointFileInfoWithList>();
                 lock (_outstandingFilesBuffer)
                 {
                     count = _outstandingFilesBuffer.Count > batchSize ? batchSize : _outstandingFilesBuffer.Count;
-                    newProcessingChunk = new List<SharePointFileInfo>(_outstandingFilesBuffer.Take(count));
+                    newProcessingChunk = new List<SharePointFileInfoWithList>(_outstandingFilesBuffer.Take(count));
                 }
 
                 if (count > 0)
@@ -191,7 +191,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
         #endregion
 
-        async Task UpdatePendingAsync(int batchSize, List<SharePointFileInfo> filesToUpdate, Action<List<SharePointFileInfo>>? filesUpdatedCallback)
+        async Task UpdatePendingAsync(int batchSize, List<SharePointFileInfoWithList> filesToUpdate, Action<List<SharePointFileInfoWithList>>? filesUpdatedCallback)
         {
             var backgroundMetaTasksThisChunk = new List<Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>>>();
 
@@ -253,7 +253,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             }
 
             // Update model & fire event
-            var updatedFiles = new List<SharePointFileInfo>(); 
+            var updatedFiles = new List<SharePointFileInfoWithList>(); 
             foreach (var fileUpdated in updates)
             {
                 lock (this)
@@ -266,9 +266,9 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             filesUpdatedCallback?.Invoke(updatedFiles);
         }
 
-        private Task Crawler_SharePointFileFound(SharePointFileInfo foundFile, int batchSize, Action<List<SharePointFileInfo>>? newFilesCallback)
+        private Task Crawler_SharePointFileFound(SharePointFileInfoWithList foundFile, int batchSize, Action<List<SharePointFileInfoWithList>>? newFilesCallback)
         {
-            SharePointFileInfo? newFile = null;
+            SharePointFileInfoWithList? newFile = null;
 
             if (foundFile is DriveItemSharePointFileInfo)
             {
@@ -293,15 +293,17 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             // Do things every $batchSize
             if (_fileFoundBuffer.Count == batchSize)
             {
-                var bufferCopy = new List<SharePointFileInfo>(_fileFoundBuffer);
+                Console.WriteLine($"Trigger new insert");
+                var bufferCopy = new List<SharePointFileInfoWithList>(_fileFoundBuffer);
                 if (newFilesCallback != null)
                 {
                     newFilesCallback.Invoke(bufferCopy);
                 }
                 _fileFoundBuffer.Clear();
+                Console.WriteLine($"END Trigger new insert");
 
                 // Start background refresh of new files
-                AddToBackgroundDocQueue(bufferCopy.Cast<SharePointFileInfo>().ToList());
+                AddToBackgroundDocQueue(bufferCopy.Cast<SharePointFileInfoWithList>().ToList());
             }
 
             return Task.CompletedTask;

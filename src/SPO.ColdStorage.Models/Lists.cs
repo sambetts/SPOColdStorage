@@ -18,7 +18,7 @@ namespace SPO.ColdStorage.Models
 
         public string Title { get; set; } = string.Empty;
         public string ServerRelativeUrl { get; set; } = string.Empty;
-        public List<SharePointFileInfo> Files { get; set; } = new List<SharePointFileInfo>();
+        public List<BaseSharePointFileInfo> Files { get; set; } = new List<BaseSharePointFileInfo>();
 
         public bool Equals(SiteList? other)
         {

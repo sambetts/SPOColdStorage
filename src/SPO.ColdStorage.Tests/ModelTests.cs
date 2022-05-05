@@ -11,14 +11,14 @@ namespace SPO.ColdStorage.Tests
         [TestMethod]
         public void SharePointFileInfoTests()
         {
-            var emptyMsg1 = new SharePointFileInfo { };
+            var emptyMsg1 = new BaseSharePointFileInfo { };
             Assert.IsFalse(emptyMsg1.IsValidInfo);
 
-            var halfEmptyMsg = new SharePointFileInfo { ServerRelativeFilePath = "/subweb1/whatever.txt" };
+            var halfEmptyMsg = new BaseSharePointFileInfo { ServerRelativeFilePath = "/subweb1/whatever.txt" };
             Assert.IsFalse(halfEmptyMsg.IsValidInfo);
 
             // File path doesn't contain web
-            var invalidMsg1 = new SharePointFileInfo
+            var invalidMsg1 = new BaseSharePointFileInfo
             { 
                 ServerRelativeFilePath = "/whatever", 
                 SiteUrl = "https://m365x352268.sharepoint.com", 
@@ -28,7 +28,7 @@ namespace SPO.ColdStorage.Tests
             Assert.IsFalse(invalidMsg1.IsValidInfo);
 
             // Trailing slashes
-            var invalidMsg2 = new SharePointFileInfo
+            var invalidMsg2 = new BaseSharePointFileInfo
             {
                 ServerRelativeFilePath = "/whatever",
                 SiteUrl = "https://m365x352268.sharepoint.com/",
@@ -38,7 +38,7 @@ namespace SPO.ColdStorage.Tests
             Assert.IsFalse(invalidMsg2.IsValidInfo);
 
             // Missing start slash on file path
-            var invalidMsg3 = new SharePointFileInfo
+            var invalidMsg3 = new BaseSharePointFileInfo
             {
                 ServerRelativeFilePath = "subweb1/whatever",
                 SiteUrl = "https://m365x352268.sharepoint.com",
@@ -48,7 +48,7 @@ namespace SPO.ColdStorage.Tests
             Assert.IsFalse(invalidMsg3.IsValidInfo);
 
             // Valid test; no folders
-            var validMsg1 = new SharePointFileInfo
+            var validMsg1 = new BaseSharePointFileInfo
             {
                 ServerRelativeFilePath = "/subweb1/whatever",
                 SiteUrl = "https://m365x352268.sharepoint.com",
@@ -60,7 +60,7 @@ namespace SPO.ColdStorage.Tests
 
 
             // Invalid folder - has leading/trailing slashes
-            var invalidMsg4 = new SharePointFileInfo
+            var invalidMsg4 = new BaseSharePointFileInfo
             {
                 ServerRelativeFilePath = "/subweb1/whatever",
                 Subfolder = "/sub1/sub2",

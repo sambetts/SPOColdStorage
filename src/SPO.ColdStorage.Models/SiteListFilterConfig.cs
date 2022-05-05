@@ -112,7 +112,7 @@ namespace SPO.ColdStorage.Models
             }
         }
 
-        public bool IncludeFolder(SharePointFileInfo fileInfo)
+        public bool IncludeFolder(BaseSharePointFileInfo fileInfo)
         {
             return IncludeFolderInMigration(fileInfo.Subfolder);
         }
