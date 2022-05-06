@@ -24,6 +24,8 @@ namespace SPO.ColdStorage.Models
         public SiteFileAnalysisState State { get; set; } = SiteFileAnalysisState.Unknown;
 
         public int? AccessCount { get; set; } = null;
+        public int VersionCount { get; set; }
+        public long VersionHistorySize { get; set; }
     }
 
 

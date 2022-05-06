@@ -37,6 +37,15 @@ namespace SPO.ColdStorage.Entities.DBEntities
         [ForeignKey(nameof(LastModifiedBy))]
         [Column("last_modified_by_user_id")]
         public int LastModifiedByUserId { get; set; }
+
+        [Column("version_count")]
+        public int VersionCount { get; set; } = 0;
+
+        [Column("versions_total_size")]
+        public long VersionHistorySize { get; set; } = 0;
+
+        [Column("file_size")]
+        public long FileSize { get; set; } = 0;
     }
 
 

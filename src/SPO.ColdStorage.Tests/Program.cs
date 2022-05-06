@@ -62,7 +62,7 @@ namespace SPO.ColdStorage.Tests
         private static async Task DoThings(SPOColdStorageDbContext db, Entities.Configuration.Config config, DebugTracer tracer, SecureSPThrottledHttpClient client)
         {
             var resp = await client.GetAsync("http://localhost:5000/api/values");
-            const int loopCount = 10000;
+            const int loopCount = 1000;
             var fakeDocs = new List<DocumentSiteWithMetadata>();
             for (int i = 0; i < loopCount; i++)
             {

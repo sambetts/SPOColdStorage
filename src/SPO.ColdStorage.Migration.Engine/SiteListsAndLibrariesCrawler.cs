@@ -114,6 +114,7 @@ namespace SPO.ColdStorage.Migration.Engine
                                         item => item.FileSystemObjectType,
                                         item => item["Modified"],
                                         item => item["Editor"],
+                                        item => item["File_x0020_Size"],
                                         item => item.File.Exists,
                                         item => item.File.ServerRelativeUrl,
                                         item => item.File.VroomItemID,
@@ -290,10 +291,16 @@ namespace SPO.ColdStorage.Migration.Engine
                     var authorVal = (FieldUserValue)authorFieldObj;
                     var author = !string.IsNullOrEmpty(authorVal.Email) ? authorVal.Email : authorVal.LookupValue;
                     var isGraphDriveItem = listModel is DocLib;
+                    long size = 0;
 
                     // Doc or list-item?
                     if (!isGraphDriveItem)
                     {
+                        var sizeVal = item.FieldValues["SMTotalFileStreamSize"];
+                        
+                        if (sizeVal != null)
+                            long.TryParse(sizeVal.ToString(), out size);
+
                         // No Graph IDs - probably a list item
                         return new SharePointFileInfoWithList
                         {
@@ -303,11 +310,16 @@ namespace SPO.ColdStorage.Migration.Engine
                             WebUrl = _spClient.Web.Url,
                             SiteUrl = _spClient.Site.Url,
                             Subfolder = dir.TrimEnd("/".ToCharArray()),
-                            List = listModel
+                            List = listModel,
+                            FileSize = size
                         };
                     }
                     else
                     {
+                        var sizeVal = item.FieldValues["File_x0020_Size"];
+
+                        if (sizeVal != null)
+                            long.TryParse(sizeVal.ToString(), out size);
                         return new DriveItemSharePointFileInfo
                         {
                             Author = author,
@@ -318,7 +330,8 @@ namespace SPO.ColdStorage.Migration.Engine
                             Subfolder = dir.TrimEnd("/".ToCharArray()),
                             GraphItemId = item.File.VroomItemID,
                             DriveId = item.File.VroomDriveID,
-                            List = listModel
+                            List = listModel,
+                            FileSize = size
                         };
                     }
                 }

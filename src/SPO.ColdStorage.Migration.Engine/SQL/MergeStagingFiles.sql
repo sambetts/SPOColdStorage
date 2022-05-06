@@ -36,13 +36,19 @@ insert into files(
 	url,
 	last_modified,
 	last_modified_by_user_id,
-	web_id
+	web_id,
+	file_size,
+	version_count,
+	versions_total_size
 	)
 	select distinct 
 		imports.ServerRelativeFilePath, 
 		imports.LastModified,
 		users.id as userId,
-		webs.id as webId
+		webs.id as webId,
+		imports.FileSize,
+		0 as version_count,
+		0 as versions_total_size
 	FROM [StagingFiles] imports
 		inner join users on users.email = imports.Author
 		inner join webs on webs.url = imports.WebUrl

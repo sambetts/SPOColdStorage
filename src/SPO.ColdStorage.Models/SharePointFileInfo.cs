@@ -41,7 +41,12 @@ namespace SPO.ColdStorage.Models
         public string Subfolder { get; set; } = string.Empty;
 
         public DateTime LastModified { get; set; } = DateTime.MinValue;
-        
+
+        /// <summary>
+        /// Bytes
+        /// </summary>
+        public long FileSize { get; set; } = 0;
+
         /// <summary>
         /// Calculated.
         /// </summary>
