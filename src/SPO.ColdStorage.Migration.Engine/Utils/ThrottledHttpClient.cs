@@ -1,6 +1,4 @@
-﻿
-
-using Microsoft.Identity.Client;
+﻿using Microsoft.Identity.Client;
 using SPO.ColdStorage.Entities.Configuration;
 using System.Net.Http.Headers;
 
@@ -11,10 +9,10 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
     /// </summary>
     public class SecureSPThrottledHttpClient : HttpClient
     {
-        private readonly bool ignoreRetryHeader;
-        private readonly DebugTracer debugTracer;
         #region Constructor, Props, and Privates
 
+        private readonly bool ignoreRetryHeader;
+        private readonly DebugTracer debugTracer;
         private DateTime? _nextCallEarliestTime = null;
         private int _concurrentCalls = 0, _throttledCalls = 0, _completedCalls = 0;
         private object _concurrentCallsObj = new object(), _throttledCallsObject = new object(), _completedCallsObject = new object();
@@ -114,7 +112,7 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
                         _throttledCalls++;
                     }
 
-                    // Do we have a "retry-after" header?
+                    // Do we have a "retry-after" header & should we use it?
                     var waitValue = response.GetRetryAfterHeaderSeconds();
                     if (!ignoreRetryHeader && waitValue.HasValue)
                     {
@@ -124,7 +122,7 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
                     }
                     else
                     {
-                        // No retry value given so we have to guess. Loop with ever-increasing wait.
+                        // We have to guess how much to back-off. Loop with ever-increasing wait.
                         if (retries == Constants.MAX_SPO_API_RETRIES)
                         {
                             // Don't try forever

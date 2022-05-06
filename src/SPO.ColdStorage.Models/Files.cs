@@ -9,13 +9,14 @@ namespace SPO.ColdStorage.Models
         AnalysisPending,
         AnalysisInProgress,
         Complete,
-        Error
+        FatalError,
+        TransientError
     }
 
-    public class DocumentSiteFile : DriveItemSharePointFileInfo
+    public class DocumentSiteWithMetadata : DriveItemSharePointFileInfo
     {
-        public DocumentSiteFile() { }
-        public DocumentSiteFile(DriveItemSharePointFileInfo driveArg) : base(driveArg)
+        public DocumentSiteWithMetadata() { }
+        public DocumentSiteWithMetadata(DriveItemSharePointFileInfo driveArg) : base(driveArg)
         {
             this.AccessCount = null;
         }

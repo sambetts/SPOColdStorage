@@ -103,6 +103,4 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
             return null;
         }
     }
-
-
 }

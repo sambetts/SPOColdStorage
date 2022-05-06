@@ -1,5 +1,4 @@
 ﻿using SPO.ColdStorage.Models;
-using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace SPO.ColdStorage.Migration.Engine.Utils
@@ -7,59 +6,51 @@ namespace SPO.ColdStorage.Migration.Engine.Utils
     public static class GraphFileInfoListExtensions
     {
         const int MAX_BATCH = 10;
-        static int reqsBackOk = 0, reqsErrored = 0;
-        static object lockObj = new object();
-        public static async Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>> GetDriveItemsAnalytics(this List<DocumentSiteFile> graphFiles, string baseSiteAddress, SecureSPThrottledHttpClient httpClient, DebugTracer tracer)
+        public static async Task<Dictionary<DocumentSiteWithMetadata, ItemAnalyticsRepsonse>> GetDriveItemsAnalytics(this List<DocumentSiteWithMetadata> graphFiles, string baseSiteAddress, SecureSPThrottledHttpClient httpClient, DebugTracer tracer)
         {
-            var fileSuccessResults = new ConcurrentDictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>();
-            var pendingResults = new ConcurrentBag<DriveItemSharePointFileInfo>(graphFiles);
+            return await GetDriveItemsAnalytics(graphFiles, baseSiteAddress, httpClient, tracer, 100);
+        }
+        public static async Task<Dictionary<DocumentSiteWithMetadata, ItemAnalyticsRepsonse>> GetDriveItemsAnalytics(this List<DocumentSiteWithMetadata> graphFiles, string baseSiteAddress, SecureSPThrottledHttpClient httpClient, DebugTracer tracer, int waitMs)
+        {
+            var fileSuccessResults = new Dictionary<DocumentSiteWithMetadata, ItemAnalyticsRepsonse>();
 
-            var batchList = new ParallelListProcessor<DocumentSiteFile>(MAX_BATCH, 10);
-            
-            await batchList.ProcessListInParallel(graphFiles, async (threadListChunk, threadIndex) =>
+            foreach (var fileToUpdate in graphFiles)
             {
-                foreach (var fileToUpdate in threadListChunk)
+                // Read doc analytics
+                var url = $"{baseSiteAddress}/_api/v2.0/drives/{fileToUpdate.DriveId}/items/{fileToUpdate.GraphItemId}" +
+                    $"/analytics/allTime";
+
+                try
                 {
-                    // Read doc analytics
-                    var url = $"{baseSiteAddress}/_api/v2.0/drives/{fileToUpdate.DriveId}/items/{fileToUpdate.GraphItemId}" +
-                        $"/analytics/allTime";
-
-                    try
+                    // Do our own parsing as Graph SDK doesn't do this very well
+                    using (var analyticsResponse = await httpClient.GetAsyncWithThrottleRetries(url, tracer))
                     {
-                        // Do our own parsing as Graph SDK doesn't do this very well
-                        using (var analyticsResponse = await httpClient.GetAsyncWithThrottleRetries(url, tracer))
-                        {
-                            var analyticsResponseBody = await analyticsResponse.Content.ReadAsStringAsync();
+                        var analyticsResponseBody = await analyticsResponse.Content.ReadAsStringAsync();
 
-                            analyticsResponse.EnsureSuccessStatusCode();
+                        // Ensure valid response
+                        analyticsResponse.EnsureSuccessStatusCode();
+                        var activitiesResponse = JsonSerializer.Deserialize<ItemAnalyticsRepsonse>(analyticsResponseBody) ?? new ItemAnalyticsRepsonse();
+                        fileToUpdate.State = SiteFileAnalysisState.Complete;
 
-                            var activitiesResponse = JsonSerializer.Deserialize<ItemAnalyticsRepsonse>(analyticsResponseBody) ?? new ItemAnalyticsRepsonse();
-                            fileSuccessResults.AddOrUpdate(fileToUpdate, activitiesResponse, (index, oldVal) => activitiesResponse);
-                            lock (lockObj)
-                            {
-                                reqsBackOk++;
-                            }
-                            await Task.Delay(100);
-                        }
-                    }
-                    catch (HttpRequestException ex)
-                    {
-                        lock (lockObj)
-                        {
-                            reqsErrored++;
-                        }
-                        fileToUpdate.State = SiteFileAnalysisState.Error;
-                        tracer.TrackException(ex);
-                        tracer.TrackTrace($"Got exception {ex.Message} getting analytics data for drive item {fileToUpdate.GraphItemId}", Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Error);
+                        fileSuccessResults.Add(fileToUpdate, activitiesResponse);
+                        await Task.Delay(waitMs);
                     }
                 }
-            });
-
-            Console.WriteLine($"\nHttpClient: {reqsBackOk} back ok, {reqsErrored} errors.");
-
-            return new Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>(fileSuccessResults);
+                catch (HttpRequestException ex)
+                {
+                    if (ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                    {
+                        fileToUpdate.State = SiteFileAnalysisState.TransientError;
+                    }
+                    else
+                    {
+                        fileToUpdate.State = SiteFileAnalysisState.FatalError;
+                    }
+                    tracer.TrackException(ex);
+                    tracer.TrackTrace($"Got exception {ex.Message} getting analytics data for drive item {fileToUpdate.GraphItemId}", Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Error);
+                }
+            }
+            return fileSuccessResults;
         }
-
     }
-
 }

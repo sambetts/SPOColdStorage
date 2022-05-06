@@ -21,7 +21,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SPO.ColdStorage.LoadGenerat
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SPO.ColdStorage.Models", "SPO.ColdStorage.Models\SPO.ColdStorage.Models.csproj", "{B2AFACD8-E3A2-42B3-9E43-3EC3582F62BC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SPO.ColdStorage.Migration.SiteSnapshotBuilder", "SPO.ColdStorage.Migration.SiteSnapshotBuilder\SPO.ColdStorage.Migration.SiteSnapshotBuilder.csproj", "{622A4923-A763-4E0B-B0C8-C0ED1D47C615}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SPO.ColdStorage.Migration.SiteSnapshotBuilder", "SPO.ColdStorage.Migration.SiteSnapshotBuilder\SPO.ColdStorage.Migration.SiteSnapshotBuilder.csproj", "{622A4923-A763-4E0B-B0C8-C0ED1D47C615}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

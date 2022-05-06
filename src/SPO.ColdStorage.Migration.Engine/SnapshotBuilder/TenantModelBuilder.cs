@@ -79,7 +79,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
             }
         }
-        Task UpdateFiles(List<DocumentSiteFile> updatedFiles)
+        Task UpdateFiles(List<DocumentSiteWithMetadata> updatedFiles)
         {
             _updateTasks.Add(Task.Run(async () =>
             {
@@ -100,7 +100,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         }
 
 
-        async Task<StatsSaveResult> UpdateStats(DocumentSiteFile updatedFile, SPOColdStorageDbContext db)
+        async Task<StatsSaveResult> UpdateStats(DocumentSiteWithMetadata updatedFile, SPOColdStorageDbContext db)
         {
             var results = StatsSaveResult.New;
             var existingFile = await db.Files.Where(f => f.Url == updatedFile.ServerRelativeFilePath).SingleOrDefaultAsync();

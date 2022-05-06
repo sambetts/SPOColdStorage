@@ -20,11 +20,10 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         private readonly SiteSnapshotModel _model;
         private SecureSPThrottledHttpClient _httpClient;
 
-        private bool _processBackgroundDocQueue = false;
         private bool _showStats = false;
         private List<SharePointFileInfoWithList> _outstandingFilesBuffer = new();
         private List<SharePointFileInfoWithList> _fileFoundBuffer = new();
-        private List<Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>>> _backgroundMetaTasks = new();
+        private List<Task<Dictionary<DocumentSiteWithMetadata, ItemAnalyticsRepsonse>>> _backgroundMetaTasks = new();
         public SiteModelBuilder(Config config, DebugTracer debugTracer, TargetMigrationSite site) : base(config, debugTracer)
         {
             this._site = site;
@@ -65,7 +64,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         {
             return await Build(100, null, null);
         }
-        public async Task<SiteSnapshotModel> Build(int batchSize, Action<List<SharePointFileInfoWithList>>? newFilesCallback, Action<List<DocumentSiteFile>>? filesUpdatedCallback)
+        public async Task<SiteSnapshotModel> Build(int batchSize, Action<List<SharePointFileInfoWithList>>? newFilesCallback, Action<List<DocumentSiteWithMetadata>>? filesUpdatedCallback)
         {
             if (batchSize < 1)
             {
@@ -85,12 +84,8 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
                 // Run background tasks
                 _ = Task.Run(() => StartStatsUpdates()).ConfigureAwait(false);
-                _ = Task.Run(() => StartBackgroundDocQueue(batchSize, filesUpdatedCallback)).ConfigureAwait(false);
 
                 await crawler.StartCrawl(_siteFilterConfig);
-
-                // Now we have all the files we'll find, update the rest of the stats on this thread
-                StopBackgroundUpdates();
 
                 _tracer.TrackTrace($"STAGE 1/2: Finished crawling site files. Waiting for background update tasks to finish...");
                 await Task.WhenAll(_backgroundMetaTasks);
@@ -101,11 +96,15 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                     // Check every second
                     await Task.Delay(5000);
 
-                    if (_model.DocsPendingAnalysis.Count > 0)
+                    // Load pending & non-fatal error files
+                    var filesToLoad = _model.DocsByState(SiteFileAnalysisState.AnalysisPending);
+                    filesToLoad.AddRange(_model.DocsByState(SiteFileAnalysisState.TransientError));
+
+                    if (filesToLoad.Count > 0)
                     {
                         // Start metadata update any doc with "pending" state
-                        Console.WriteLine($"Have completed {_model.DocsCompleted.Count} of {_model.AllFiles.Count}. Pending: {_model.DocsPendingAnalysis.Count}");
-                        await UpdatePendingAsync(batchSize, _model.DocsPendingAnalysis.Cast<SharePointFileInfoWithList>().ToList(), filesUpdatedCallback);
+                        Console.WriteLine($"Have completed {_model.DocsCompleted.Count} of {_model.AllFiles.Count}. Pending: {filesToLoad.Count} ({_model.DocsByState(SiteFileAnalysisState.TransientError).Count} errors to retry)");
+                        await UpdatePendingFilesAsync(batchSize, filesToLoad.Cast<SharePointFileInfoWithList>().ToList(), filesUpdatedCallback);
                     }
                     else
                     {
@@ -116,7 +115,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                     filesToGetAnalysisFor = !_model.AnalysisFinished;
                 }
                 StopStatsUpdates();
-
+                _model.InvalidateCaches();
                 _model.Finished = DateTime.Now;
                 var ts = _model.Finished.Value.Subtract(_model.Started);
                 _tracer.TrackTrace($"STAGE 2/2: Finished getting metadata for site files. All done in {ts.TotalMinutes.ToString("N2")} minutes.");
@@ -124,53 +123,6 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
 
             return _model;
         }
-
-        #region Background Files Processing
-
-        private void StopBackgroundUpdates()
-        {
-            lock (_outstandingFilesBuffer)
-            {
-                _processBackgroundDocQueue = false;
-            }
-        }
-
-        void AddToBackgroundDocQueue(List<SharePointFileInfoWithList> documentSiteFiles)
-        {
-            lock (_outstandingFilesBuffer)
-            {
-                _outstandingFilesBuffer.AddRange(documentSiteFiles);
-            }
-        }
-
-        async Task StartBackgroundDocQueue(int batchSize, Action<List<DocumentSiteFile>>? filesUpdatedCallback)
-        {
-            Console.WriteLine("Starting background metadata loading...");
-            _processBackgroundDocQueue = true;
-            while (_processBackgroundDocQueue)
-            {
-                var count = 0;
-                var newProcessingChunk = new List<SharePointFileInfoWithList>();
-                lock (_outstandingFilesBuffer)
-                {
-                    count = _outstandingFilesBuffer.Count > batchSize ? batchSize : _outstandingFilesBuffer.Count;
-                    newProcessingChunk = new List<SharePointFileInfoWithList>(_outstandingFilesBuffer.Take(count));
-                }
-
-                if (count > 0)
-                {
-                    await UpdatePendingAsync(batchSize, newProcessingChunk, filesUpdatedCallback);
-                    lock (_outstandingFilesBuffer)
-                    {
-                        _outstandingFilesBuffer.RemoveRange(0, count);
-                    }
-                }
-                await Task.Delay(1000);
-            }
-            Console.WriteLine("Finished background metadata loading.");
-        }
-
-        #endregion
 
 
         #region Stats Update
@@ -190,8 +142,8 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             {
                 lock (this)
                 {
-                    if (_model.DocsPendingAnalysis.Count > 0)
-                        Console.WriteLine($"{_model.DocsPendingAnalysis.Count.ToString("N0")} files pending metadata: " +
+                    if (_model.DocsByState(SiteFileAnalysisState.AnalysisPending).Count > 0)
+                        Console.WriteLine($"{_model.DocsByState(SiteFileAnalysisState.AnalysisPending).Count.ToString("N0")} files pending metadata: " +
                             $"{_httpClient.CompletedCalls.ToString("N0")} calls completed; {_httpClient.ThrottledCalls.ToString("N0")} throttled (total); {_httpClient.ConcurrentCalls} currently active");
 
                 }
@@ -202,19 +154,19 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         #endregion
 
         int updatesBack = 0, updatesSent = 0;
-        async Task UpdatePendingAsync(int batchSize, List<SharePointFileInfoWithList> filesToUpdate, Action<List<DocumentSiteFile>>? filesUpdatedCallback)
+        async Task UpdatePendingFilesAsync(int batchSize, List<SharePointFileInfoWithList> filesToUpdate, Action<List<DocumentSiteWithMetadata>>? filesUpdatedCallback)
         {
-            var backgroundMetaTasksThisChunk = new List<Task<Dictionary<DriveItemSharePointFileInfo, ItemAnalyticsRepsonse>>>();
+            var backgroundMetaTasksThisChunk = new List<Task<Dictionary<DocumentSiteWithMetadata, ItemAnalyticsRepsonse>>>();
 
             // Begin background loading of extra metadata
-            var pendingFilesToAnalyse = new List<DocumentSiteFile>();
+            var pendingFilesToAnalyse = new List<DocumentSiteWithMetadata>();
 
             foreach (var fileToUpdate in filesToUpdate)
             {
                 // We only get stats for docs, not attachments
-                if (fileToUpdate is DocumentSiteFile)
+                if (fileToUpdate is DocumentSiteWithMetadata)
                 {
-                    var docToUpdate = (DocumentSiteFile)fileToUpdate;
+                    var docToUpdate = (DocumentSiteWithMetadata)fileToUpdate;
 
                     // Avoid analysing more than once
                     docToUpdate.State = SiteFileAnalysisState.AnalysisInProgress;
@@ -224,7 +176,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 // Start new background every $CHUNK_SIZE
                 if (pendingFilesToAnalyse.Count >= batchSize)
                 {
-                    var newFileChunkCopy = new List<DocumentSiteFile>(pendingFilesToAnalyse);
+                    var newFileChunkCopy = new List<DocumentSiteWithMetadata>(pendingFilesToAnalyse);
                     pendingFilesToAnalyse.Clear();
 
                     // Background process chunk
@@ -266,14 +218,14 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 }
 
                 // Update model & fire event
-                var updatedFiles = new List<DocumentSiteFile>();
+                var updatedFiles = new List<DocumentSiteWithMetadata>();
                 foreach (var fileUpdated in updates)
                 {
                     updatesBack++;
                     lock (this)
                     {
                         // Update model
-                        updatedFiles.Add(_model.UpdateDocItem(fileUpdated.Key, fileUpdated.Value));
+                        updatedFiles.Add(_model.UpdateDocItemAndInvalidateCaches(fileUpdated.Key, fileUpdated.Value));
                     }
                 }
 
@@ -304,7 +256,7 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                 var driveArg = (DriveItemSharePointFileInfo)foundFile;
 
                 // Set newly found file as "pending" analysis data
-                newFile = new DocumentSiteFile(driveArg) { State = SiteFileAnalysisState.AnalysisPending };
+                newFile = new DocumentSiteWithMetadata(driveArg) { State = SiteFileAnalysisState.AnalysisPending };
             }
             else
             {
@@ -328,9 +280,6 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
                         newFilesCallback.Invoke(bufferCopy);
                     }
                     _fileFoundBuffer.Clear();
-
-                    // Start background refresh of new files
-                    AddToBackgroundDocQueue(bufferCopy.Cast<SharePointFileInfoWithList>().ToList());
                 }
             }
 

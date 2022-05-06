@@ -42,7 +42,7 @@ namespace SPO.ColdStorage.Models
         }
         public string DriveId { get; set; } = string.Empty;
 
-        public List<DocumentSiteFile> Documents => Files.Where(f => f.GetType() == typeof(DocumentSiteFile)).Cast<DocumentSiteFile>().ToList();
+        public List<DocumentSiteWithMetadata> Documents => Files.Where(f => f.GetType() == typeof(DocumentSiteWithMetadata)).Cast<DocumentSiteWithMetadata>().ToList();
         public string Delta { get; set; } = string.Empty;
     }
 

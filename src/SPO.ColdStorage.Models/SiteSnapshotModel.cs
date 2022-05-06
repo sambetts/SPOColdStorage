@@ -41,54 +41,40 @@ namespace SPO.ColdStorage.Models
             }
         }
 
-        private List<DocumentSiteFile>? _docsPendingAnalysis = null;
-        public List<DocumentSiteFile> DocsPendingAnalysis
+        public bool AnalysisFinished 
         {
-            get
+            get 
             {
-                if (_docsPendingAnalysis == null)
-                {
-                    _docsPendingAnalysis = AllFiles
-                        .Where(f => f is DocumentSiteFile && ((DocumentSiteFile)f).State == SiteFileAnalysisState.AnalysisPending)
-                        .Cast<DocumentSiteFile>()
-                        .ToList();
-                }
-                return _docsPendingAnalysis;
+                var r = new List<DocumentSiteWithMetadata>(DocsByState(SiteFileAnalysisState.AnalysisPending));
+                r.AddRange(DocsByState(SiteFileAnalysisState.AnalysisInProgress));
+                r.AddRange(DocsByState(SiteFileAnalysisState.TransientError));
+                return !r.Any();
             }
-        }
+        } 
 
-        public bool AnalysisFinished => !AllFiles
-                        .Where(f => f is DocumentSiteFile && (((DocumentSiteFile)f).State == SiteFileAnalysisState.AnalysisPending || ((DocumentSiteFile)f).State == SiteFileAnalysisState.AnalysisInProgress))
-                        .Any();
 
-        private List<DocumentSiteFile>? _docsWithError = null;
-        public List<DocumentSiteFile> DocsWithError
+        private List<DocumentSiteWithMetadata>? _docsWithError = null;
+        public List<DocumentSiteWithMetadata> DocsWithErrorAny
         {
             get
             {
                 if (_docsWithError == null)
                 {
-                    _docsWithError = AllFiles
-                        .Where(f => f is DocumentSiteFile && ((DocumentSiteFile)f).State == SiteFileAnalysisState.Error)
-                        .Cast<DocumentSiteFile>()
-                        .ToList();
+                    _docsWithError = new List<DocumentSiteWithMetadata>(DocsByState(SiteFileAnalysisState.FatalError));
+                    _docsWithError.AddRange(DocsByState(SiteFileAnalysisState.TransientError));
                 }
                 return _docsWithError;
             }
         }
 
-
-        private List<DocumentSiteFile>? _docsCompleted = null;
-        public List<DocumentSiteFile> DocsCompleted
+        private List<DocumentSiteWithMetadata>? _docsCompleted = null;
+        public List<DocumentSiteWithMetadata> DocsCompleted
         {
             get
             {
                 if (_docsCompleted == null)
                 {
-                    _docsCompleted = AllFiles
-                        .Where(f => f is DocumentSiteFile && ((DocumentSiteFile)f).State == SiteFileAnalysisState.Complete)
-                        .Cast<DocumentSiteFile>()
-                        .ToList();
+                    _docsCompleted = DocsByState(SiteFileAnalysisState.Complete);
                 }
                 return _docsCompleted;
             }
@@ -96,7 +82,21 @@ namespace SPO.ColdStorage.Models
 
         #endregion
 
-        public DocumentSiteFile UpdateDocItem(DriveItemSharePointFileInfo updatedDocInfo, ItemAnalyticsRepsonse.AnalyticsItemActionStat accessStats)
+        Dictionary<SiteFileAnalysisState, List<DocumentSiteWithMetadata>> _docsByStateCache = new();
+        public List<DocumentSiteWithMetadata> DocsByState(SiteFileAnalysisState state)
+        {
+            if (!_docsByStateCache.ContainsKey(state))
+            { 
+                var results = AllFiles
+                        .Where(f => f is DocumentSiteWithMetadata && ((DocumentSiteWithMetadata)f).State == state)
+                        .Cast<DocumentSiteWithMetadata>()
+                        .ToList();
+                _docsByStateCache.Add(state, results);
+            }
+            return _docsByStateCache[state];
+        }
+
+        public DocumentSiteWithMetadata UpdateDocItemAndInvalidateCaches(DriveItemSharePointFileInfo updatedDocInfo, ItemAnalyticsRepsonse.AnalyticsItemActionStat accessStats)
         {
             var docLib = AllDocLibs.Where(l => l.DriveId == updatedDocInfo.DriveId).SingleOrDefault();
             if (docLib == null) throw new ArgumentOutOfRangeException(nameof(updatedDocInfo), $"No library in model for drive Id {updatedDocInfo.DriveId}");
@@ -104,8 +104,8 @@ namespace SPO.ColdStorage.Models
             var file = docLib.Documents.Where(d => d.GraphItemId == updatedDocInfo.GraphItemId).SingleOrDefault();
             if (file != null)
             {
+                // Set downloaded metadata
                 file.AccessCount = accessStats.ActionCount;
-                file.State = SiteFileAnalysisState.Complete;
 
                 InvalidateCaches();
 
@@ -135,9 +135,11 @@ namespace SPO.ColdStorage.Models
         }
         public void InvalidateCaches()
         {
-            _docsPendingAnalysis = null;
             _allFilesCache = null;
             _docLibsCache = null;
+            _docsCompleted = null;
+            _docsWithError = null;
+            _docsByStateCache.Clear();
         }
     }
 }

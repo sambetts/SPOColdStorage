@@ -20,9 +20,9 @@ namespace SPO.ColdStorage.Tests
             var l = new DocLib();
             m.Lists.Add(l);
 
-            var f1 = new DocumentSiteFile { State = SiteFileAnalysisState.AnalysisPending };
-            var f2 = new DocumentSiteFile { State = SiteFileAnalysisState.AnalysisInProgress };
-            l.Files.AddRange(new DocumentSiteFile []{ f1, f2 });
+            var f1 = new DocumentSiteWithMetadata { State = SiteFileAnalysisState.AnalysisPending };
+            var f2 = new DocumentSiteWithMetadata { State = SiteFileAnalysisState.AnalysisInProgress };
+            l.Files.AddRange(new DocumentSiteWithMetadata []{ f1, f2 });
 
             m.InvalidateCaches();
             Assert.IsFalse(m.AnalysisFinished);
