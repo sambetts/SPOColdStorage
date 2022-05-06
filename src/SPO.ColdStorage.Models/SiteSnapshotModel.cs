@@ -12,25 +12,25 @@ namespace SPO.ColdStorage.Models
         public DateTime Started { get; set; } = DateTime.Now;
         public DateTime? Finished { get; set; }
 
-        List<SiteList> Lists { get; set; } = new List<SiteList>();
+        public List<SiteList> Lists { get; set; } = new List<SiteList>();
 
         private List<DocLib>? _docLibsCache = null;
-        public List<DocLib> DocLibs 
-        { 
-            get 
+        public List<DocLib> AllDocLibs
+        {
+            get
             {
                 if (_docLibsCache == null)
-                { 
+                {
                     _docLibsCache = Lists.Where(f => f.GetType() == typeof(DocLib)).Cast<DocLib>().ToList();
                 }
                 return _docLibsCache;
-            } 
+            }
         }
 
         List<BaseSharePointFileInfo>? _allFilesCache = null;
-        public List<BaseSharePointFileInfo> AllFiles 
+        public List<BaseSharePointFileInfo> AllFiles
         {
-            get 
+            get
             {
                 if (_allFilesCache == null)
                 {
@@ -44,7 +44,7 @@ namespace SPO.ColdStorage.Models
         private List<DocumentSiteFile>? _docsPendingAnalysis = null;
         public List<DocumentSiteFile> DocsPendingAnalysis
         {
-            get 
+            get
             {
                 if (_docsPendingAnalysis == null)
                 {
@@ -56,6 +56,10 @@ namespace SPO.ColdStorage.Models
                 return _docsPendingAnalysis;
             }
         }
+
+        public bool AnalysisFinished => !AllFiles
+                        .Where(f => f is DocumentSiteFile && (((DocumentSiteFile)f).State == SiteFileAnalysisState.AnalysisPending || ((DocumentSiteFile)f).State == SiteFileAnalysisState.AnalysisInProgress))
+                        .Any();
 
         private List<DocumentSiteFile>? _docsWithError = null;
         public List<DocumentSiteFile> DocsWithError
@@ -94,10 +98,10 @@ namespace SPO.ColdStorage.Models
 
         public DocumentSiteFile UpdateDocItem(DriveItemSharePointFileInfo updatedDocInfo, ItemAnalyticsRepsonse.AnalyticsItemActionStat accessStats)
         {
-            var docLib = DocLibs.Where(l => l.DriveId == updatedDocInfo.DriveId).SingleOrDefault();
+            var docLib = AllDocLibs.Where(l => l.DriveId == updatedDocInfo.DriveId).SingleOrDefault();
             if (docLib == null) throw new ArgumentOutOfRangeException(nameof(updatedDocInfo), $"No library in model for drive Id {updatedDocInfo.DriveId}");
 
-            var file = docLib.Documents.Where(d=> d.GraphItemId == updatedDocInfo.GraphItemId).SingleOrDefault();
+            var file = docLib.Documents.Where(d => d.GraphItemId == updatedDocInfo.GraphItemId).SingleOrDefault();
             if (file != null)
             {
                 file.AccessCount = accessStats.ActionCount;
@@ -129,7 +133,7 @@ namespace SPO.ColdStorage.Models
                 InvalidateCaches();
             }
         }
-        void InvalidateCaches()
+        public void InvalidateCaches()
         {
             _docsPendingAnalysis = null;
             _allFilesCache = null;
