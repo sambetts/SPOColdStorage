@@ -16,6 +16,7 @@ namespace SPO.ColdStorage.Models
             this.Author = driveArg.Author;
             this.Subfolder = driveArg.Subfolder;
             this.LastModified = driveArg.LastModified;
+            this.FileSize = driveArg.FileSize;
         }
 
         /// <summary>

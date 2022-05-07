@@ -69,7 +69,7 @@ namespace SPO.ColdStorage.Migration.Engine
                     }
                     else
                     {
-                        _tracer.TrackTrace($"Ignoring '{list.Title}' - not configured to migrate.");
+                        _tracer.TrackTrace($"Ignoring '{list.Title}' - not configured to analyse.");
                     }
                 }
                 else

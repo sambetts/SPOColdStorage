@@ -42,10 +42,14 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
         {
             var s = new SiteModelBuilder(base._config, base._tracer, site);
 
-            return await s.Build(100,
+            var siteModel = await s.Build(100,
                 async filesDiscovered => await InsertFilesAsync(filesDiscovered),
                 async updatedFiles => await UpdateFiles(updatedFiles)
             );
+
+            await Task.WhenAll(_updateTasks);
+            _tracer.TrackTrace($"--{site.RootURL} finished.");
+            return siteModel;
         }
         async Task InsertFilesAsync(List<SharePointFileInfoWithList> insertedFiles)
         {
@@ -117,6 +121,10 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             // Set stats
             existingFile.StatsUpdated = DateTime.Now;
             existingFile.AccessCount = updatedFile.AccessCount;
+            existingFile.VersionCount = updatedFile.VersionCount;
+            existingFile.VersionHistorySize = updatedFile.VersionHistorySize;
+            existingFile.LastModified = updatedFile.LastModified;
+            existingFile.FileSize = updatedFile.FileSize;
 
             return results;
         }

@@ -247,7 +247,6 @@ namespace SPO.ColdStorage.Migration.Engine.SnapshotBuilder
             }
 
             filesUpdatedCallback?.Invoke(updatedFiles);
-
         }
 
         private void CrawlComplete(Action<List<SharePointFileInfoWithList>>? newFilesCallback)
